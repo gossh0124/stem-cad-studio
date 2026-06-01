@@ -1,0 +1,2048 @@
+{
+  "project_name": "plant_monitor_demo",
+  "project_category": "Gardening",
+  "_instruction": "植物監測儀",
+  "_canned_demo": true,
+  "checkpoint_phase": 5,
+  "components_resolved": true,
+  "cot_plan": {
+    "high_level_plan": "持續偵測土壤濕度與環境溫度，OLED 顯示即時讀值，協助使用者判斷澆水時機。",
+    "subsystems": [
+      {
+        "role": "Brain",
+        "part": "Arduino Uno R3",
+        "type": "Arduino-Uno-class",
+        "reason": "採用 ATmega328P 微控制器，透過數位/類比 GPIO 腳位控制外部元件。",
+        "power_mw": 250,
+        "pins": 0
+      },
+      {
+        "role": "Power",
+        "part": "2xAA Battery Holder",
+        "type": "Battery-AA-class",
+        "reason": "標準 AA 乾電池，取得方便，適合低功耗感測器節點。",
+        "power_mw": 0,
+        "pins": 0
+      },
+      {
+        "role": "Sensor",
+        "part": "Capacitive Soil Moisture Sensor v1.2",
+        "type": "Sensor-SoilMoisture-class",
+        "reason": "量測土壤導電率以判斷含水量，適合自動澆水系統。",
+        "power_mw": 25,
+        "pins": 1
+      },
+      {
+        "role": "Sensor",
+        "part": "DHT22 Temperature Humidity Sensor",
+        "type": "Sensor-TempHumid-class",
+        "reason": "量測環境溫度與相對濕度，常用於智慧農業或氣候監控。",
+        "power_mw": 7,
+        "pins": 1
+      },
+      {
+        "role": "Output",
+        "part": "SSD1306 OLED 0.96 inch I2C",
+        "type": "Display-OLED-class",
+        "reason": "有機發光二極體螢幕，對比高耗電低，顯示文字與圖形。",
+        "power_mw": 100,
+        "pins": 2
+      }
+    ],
+    "parameter_hints": {
+      "enclosure_size": "medium",
+      "material": "PLA",
+      "wall_thickness_mm": 2.0,
+      "has_lid": true,
+      "environment": "陽台/半戶外",
+      "power_source": "AA 電池"
+    },
+    "power_summary": {
+      "total_mw": 382,
+      "budget_mw": 4000
+    },
+    "total_pins": 4
+  },
+  "components": [
+    {
+      "role": "Brain",
+      "type": "Arduino-Uno-class",
+      "qty": 1,
+      "spec": {
+        "name": "Arduino Uno R3",
+        "voltage_v": 5.0,
+        "current_ma": 50.0,
+        "length_mm": 68.58,
+        "width_mm": 53.34,
+        "height_mm": 14.0,
+        "connector_ports": []
+      },
+      "educational_rationale": "採用 ATmega328P 微控制器，透過數位/類比 GPIO 腳位控制外部元件。"
+    },
+    {
+      "role": "Power",
+      "type": "Battery-AA-class",
+      "qty": 1,
+      "spec": {
+        "name": "2xAA Battery Holder",
+        "voltage_v": 3.0,
+        "current_ma": 0.0,
+        "length_mm": 59.0,
+        "width_mm": 32.0,
+        "height_mm": 15.0,
+        "connector_ports": []
+      },
+      "educational_rationale": "標準 AA 乾電池，取得方便，適合低功耗感測器節點。"
+    },
+    {
+      "role": "Sensor",
+      "type": "Sensor-SoilMoisture-class",
+      "qty": 1,
+      "spec": {
+        "name": "Capacitive Soil Moisture Sensor v1.2",
+        "voltage_v": 3.3,
+        "current_ma": 5.0,
+        "length_mm": 98.0,
+        "width_mm": 23.0,
+        "height_mm": 3.5,
+        "connector_ports": []
+      },
+      "educational_rationale": "量測土壤導電率以判斷含水量，適合自動澆水系統。"
+    },
+    {
+      "role": "Sensor",
+      "type": "Sensor-TempHumid-class",
+      "qty": 1,
+      "spec": {
+        "name": "DHT22 Temperature Humidity Sensor",
+        "voltage_v": 3.3,
+        "current_ma": 1.5,
+        "length_mm": 25.1,
+        "width_mm": 15.1,
+        "height_mm": 7.7,
+        "connector_ports": []
+      },
+      "educational_rationale": "量測環境溫度與相對濕度，常用於智慧農業或氣候監控。"
+    },
+    {
+      "role": "Output",
+      "type": "Display-OLED-class",
+      "qty": 1,
+      "spec": {
+        "name": "SSD1306 OLED 0.96 inch I2C",
+        "voltage_v": 3.3,
+        "current_ma": 20.0,
+        "length_mm": 27.0,
+        "width_mm": 27.0,
+        "height_mm": 4.0,
+        "connector_ports": []
+      },
+      "educational_rationale": "有機發光二極體螢幕，對比高耗電低，顯示文字與圖形。"
+    }
+  ],
+  "enclosure_constraints": {
+    "target_size": "medium",
+    "max_dimension_mm": 220,
+    "wall_thickness_mm": 2.0,
+    "material": "PLA"
+  },
+  "enclosure_sizing": {
+    "target_size": "medium",
+    "max_dimension_mm": 220,
+    "component_count": 5,
+    "estimated_area_mm2": 12653,
+    "max_component_dim_mm": 98.0,
+    "rationale": "共 5 個元件，估算佈局面積 12653 mm²，建議 一般尺寸（≤ 220mm）",
+    "wall_thickness_mm": 2.0,
+    "material": "PLA"
+  },
+  "inventory_mentions": [],
+  "bom": [
+    {
+      "role": "Brain",
+      "type": "Arduino-Uno-class",
+      "label": "Arduino Uno R3",
+      "qty": 1,
+      "unit_ma": 50.0,
+      "total_ma": 50.0,
+      "unit_ntd": 250,
+      "total_ntd": 250
+    },
+    {
+      "role": "Power",
+      "type": "Battery-AA-class",
+      "label": "2xAA Battery Holder",
+      "qty": 1,
+      "unit_ma": 0.0,
+      "total_ma": 0.0,
+      "unit_ntd": 40,
+      "total_ntd": 40
+    },
+    {
+      "role": "Sensor",
+      "type": "Sensor-SoilMoisture-class",
+      "label": "Capacitive Soil Moisture Sensor v1.2",
+      "qty": 1,
+      "unit_ma": 5.0,
+      "total_ma": 5.0,
+      "unit_ntd": 40,
+      "total_ntd": 40
+    },
+    {
+      "role": "Sensor",
+      "type": "Sensor-TempHumid-class",
+      "label": "DHT22 Temperature Humidity Sensor",
+      "qty": 1,
+      "unit_ma": 1.5,
+      "total_ma": 1.5,
+      "unit_ntd": 90,
+      "total_ntd": 90
+    },
+    {
+      "role": "Output",
+      "type": "Display-OLED-class",
+      "label": "SSD1306 OLED 0.96 inch I2C",
+      "qty": 1,
+      "unit_ma": 20.0,
+      "total_ma": 20.0,
+      "unit_ntd": 120,
+      "total_ntd": 120
+    }
+  ],
+  "power_budget": {
+    "total_ma": 76.5,
+    "budget_ma": 800,
+    "ok": true,
+    "supply_v": 5.0,
+    "power_source": "Battery-AA-class",
+    "needs_ldo": false,
+    "total_mw": 382.5,
+    "needs_ventilation": false
+  },
+  "phase3_constraint_check": {
+    "overall_ok": true,
+    "timestamp": "2026-05-31 15:29",
+    "results": {
+      "power": {
+        "ok": true,
+        "details": [
+          {
+            "level": "OK",
+            "rule": "PowerBudget",
+            "msg": "76/800 mA (Battery-AA-class)"
+          }
+        ]
+      },
+      "io": {
+        "ok": true,
+        "details": []
+      },
+      "pin_current": {
+        "ok": true,
+        "details": []
+      },
+      "wiring": {
+        "ok": true,
+        "details": []
+      },
+      "geometry": {
+        "ok": true,
+        "details": {
+          "spatial_ok": true
+        }
+      },
+      "interference": {
+        "ok": true,
+        "details": {
+          "ok": true
+        }
+      }
+    }
+  },
+  "wiring_notes": [],
+  "schematic_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"480\" viewBox=\"0 0 800 480\" style=\"background:#0a0a0f;font-family:'IBM Plex Mono','Courier New',monospace;\"><style>@keyframes sigflow { 0%{stroke-dashoffset:40;opacity:.9} 100%{stroke-dashoffset:0;opacity:.2} }\n.sig-anim { stroke-dasharray:6 4; animation:sigflow .7s linear infinite; }</style><defs><marker id=\"arrowG\" markerWidth=\"6\" markerHeight=\"5\" refX=\"5\" refY=\"2.5\" orient=\"auto\"><polygon points=\"0 0, 6 2.5, 0 5\" fill=\"#00cc66\" opacity=\"0.8\" /></marker><marker id=\"arrowP\" markerWidth=\"6\" markerHeight=\"5\" refX=\"5\" refY=\"2.5\" orient=\"auto\"><polygon points=\"0 0, 6 2.5, 0 5\" fill=\"#cc4488\" opacity=\"0.8\" /></marker></defs><line x1=\"0\" y1=\"0\" x2=\"800\" y2=\"0\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"30\" x2=\"800\" y2=\"30\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"60\" x2=\"800\" y2=\"60\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"90\" x2=\"800\" y2=\"90\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"120\" x2=\"800\" y2=\"120\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"150\" x2=\"800\" y2=\"150\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"180\" x2=\"800\" y2=\"180\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"210\" x2=\"800\" y2=\"210\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"240\" x2=\"800\" y2=\"240\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"270\" x2=\"800\" y2=\"270\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"300\" x2=\"800\" y2=\"300\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"330\" x2=\"800\" y2=\"330\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"360\" x2=\"800\" y2=\"360\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"390\" x2=\"800\" y2=\"390\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"420\" x2=\"800\" y2=\"420\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"450\" x2=\"800\" y2=\"450\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"480\" x2=\"800\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"0\" x2=\"0\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"30\" y1=\"0\" x2=\"30\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"60\" y1=\"0\" x2=\"60\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"90\" y1=\"0\" x2=\"90\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"120\" y1=\"0\" x2=\"120\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"150\" y1=\"0\" x2=\"150\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"180\" y1=\"0\" x2=\"180\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"210\" y1=\"0\" x2=\"210\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"240\" y1=\"0\" x2=\"240\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"270\" y1=\"0\" x2=\"270\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"300\" y1=\"0\" x2=\"300\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"330\" y1=\"0\" x2=\"330\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"360\" y1=\"0\" x2=\"360\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"390\" y1=\"0\" x2=\"390\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"420\" y1=\"0\" x2=\"420\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"450\" y1=\"0\" x2=\"450\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"480\" y1=\"0\" x2=\"480\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"510\" y1=\"0\" x2=\"510\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"540\" y1=\"0\" x2=\"540\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"570\" y1=\"0\" x2=\"570\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"600\" y1=\"0\" x2=\"600\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"630\" y1=\"0\" x2=\"630\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"660\" y1=\"0\" x2=\"660\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"690\" y1=\"0\" x2=\"690\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"720\" y1=\"0\" x2=\"720\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"750\" y1=\"0\" x2=\"750\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"780\" y1=\"0\" x2=\"780\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><rect x=\"350\" y=\"180\" width=\"100\" height=\"120\" rx=\"4\" fill=\"#141420\" stroke=\"#00aaff\" stroke-width=\"1.5\"><title>Arduino MCU</title></rect><text x=\"400\" y=\"234\" text-anchor=\"middle\" fill=\"#00aaff\" font-size=\"11\" font-weight=\"700\">Arduino</text><text x=\"400\" y=\"248\" text-anchor=\"middle\" fill=\"#00aaff\" font-size=\"11\" font-weight=\"700\">Uno</text><rect x=\"360\" y=\"14\" width=\"80\" height=\"24\" rx=\"4\" fill=\"none\" stroke=\"#f0c060\" stroke-width=\"1.5\" stroke-dasharray=\"4,2\"><title>Power: AA 電池</title></rect><text x=\"400\" y=\"30\" text-anchor=\"middle\" fill=\"#f0c060\" font-size=\"10\">AA 電池</text><line x1=\"400\" y1=\"38\" x2=\"400\" y2=\"180\" stroke=\"#f0c060\" stroke-width=\"1.5\" stroke-dasharray=\"3,2\" /><g data-xv-id=\"comp:OLED\" style=\"cursor:pointer;\"><rect x=\"85\" y=\"215\" width=\"90\" height=\"50\" rx=\"4\" fill=\"#141420\" stroke=\"#00ff88\" stroke-width=\"1.5\"><title>SSD1306 0.96-inch OLED Display Module (I2C) [SCL=DA5, SDA=DA4]</title></rect><text x=\"130\" y=\"234\" text-anchor=\"middle\" fill=\"#00ff88\" font-size=\"9\">OLED</text><text x=\"130\" y=\"247\" text-anchor=\"middle\" fill=\"#00ff88\" font-size=\"9\">SSD1306</text><path d=\"M175,236 C262,236 262,236 350,236\" fill=\"none\" stroke=\"#4488ff\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"-20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"179\" y=\"233\" fill=\"#4488ff\" font-size=\"7\">SCL→DA5</text><path d=\"M175,244 C270,244 270,244 350,244\" fill=\"none\" stroke=\"#ffaa00\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"-20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"179\" y=\"241\" fill=\"#ffaa00\" font-size=\"7\">SDA→DA4</text><circle cx=\"79\" cy=\"232\" r=\"3\" fill=\"#ff4444\" /><circle cx=\"79\" cy=\"248\" r=\"3\" fill=\"#333\" /></g><g data-xv-id=\"comp:SoilMoisture\" style=\"cursor:pointer;\"><rect x=\"625\" y=\"175\" width=\"90\" height=\"50\" rx=\"4\" fill=\"#141420\" stroke=\"#ff88cc\" stroke-width=\"1.5\"><title>土壤濕度感測器 [AO=A0]</title></rect><text x=\"670\" y=\"194\" text-anchor=\"middle\" fill=\"#ff88cc\" font-size=\"9\">Soil</text><text x=\"670\" y=\"207\" text-anchor=\"middle\" fill=\"#ff88cc\" font-size=\"9\">Sensor</text><path d=\"M450,200 C537,200 537,200 625,200\" fill=\"none\" stroke=\"#44cc44\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"454\" y=\"197\" fill=\"#44cc44\" font-size=\"7\">AO→A0</text><circle cx=\"721\" cy=\"192\" r=\"3\" fill=\"#ff4444\" /><circle cx=\"721\" cy=\"208\" r=\"3\" fill=\"#333\" /></g><g data-xv-id=\"comp:TempHumid\" style=\"cursor:pointer;\"><rect x=\"625\" y=\"255\" width=\"90\" height=\"50\" rx=\"4\" fill=\"#141420\" stroke=\"#ff88cc\" stroke-width=\"1.5\"><title>DHT22 (AM2302) Temperature &amp; Humidity Sensor [DATA=D2]</title></rect><text x=\"670\" y=\"274\" text-anchor=\"middle\" fill=\"#ff88cc\" font-size=\"9\">DHT22</text><text x=\"670\" y=\"287\" text-anchor=\"middle\" fill=\"#ff88cc\" font-size=\"9\">Temp/Hum</text><path d=\"M450,280 C537,280 537,280 625,280\" fill=\"none\" stroke=\"#44cc44\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"454\" y=\"277\" fill=\"#44cc44\" font-size=\"7\">DATA→D2</text><circle cx=\"721\" cy=\"272\" r=\"3\" fill=\"#ff4444\" /><circle cx=\"721\" cy=\"288\" r=\"3\" fill=\"#333\" /></g><line x1=\"60\" y1=\"460\" x2=\"740\" y2=\"460\" stroke=\"#555\" stroke-width=\"1\" stroke-dasharray=\"3,3\" /><text x=\"400\" y=\"474\" text-anchor=\"middle\" fill=\"#555\" font-size=\"9\">─── GND Rail ───</text><rect x=\"20\" y=\"20\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#00aaff\" /><text x=\"34\" y=\"29\" fill=\"#aaa\" font-size=\"9\">MCU 主控</text><rect x=\"20\" y=\"36\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#00ff88\" /><text x=\"34\" y=\"45\" fill=\"#aaa\" font-size=\"9\">輸出元件</text><rect x=\"20\" y=\"52\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#ff88cc\" /><text x=\"34\" y=\"61\" fill=\"#aaa\" font-size=\"9\">感測器</text><rect x=\"20\" y=\"68\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#f0c060\" /><text x=\"34\" y=\"77\" fill=\"#aaa\" font-size=\"9\">電源</text></svg>",
+  "scope_note": "",
+  "role_alternatives": {
+    "Brain": [
+      {
+        "type": "ESP32-class",
+        "name": "ESP32 DevKit V1",
+        "power_mw": 792,
+        "current_ma": 240,
+        "reason": "雙核心 CPU 內建 Wi-Fi/Bluetooth，適合 IoT 無線控制應用。"
+      },
+      {
+        "type": "RaspberryPi-class",
+        "name": "Raspberry Pi 4 Model B",
+        "power_mw": 3000,
+        "current_ma": 600,
+        "reason": "Linux 單板電腦，適合需要作業系統支援的複雜 AI 應用。"
+      },
+      {
+        "type": "Microbit-class",
+        "name": "BBC micro:bit v2",
+        "power_mw": 99,
+        "current_ma": 30,
+        "reason": "內建加速度計與 LED 矩陣，專為 STEM 教育設計的微控制板。"
+      }
+    ],
+    "Power": [
+      {
+        "type": "USB-5V-class",
+        "name": "Generic USB 5V Power Module",
+        "power_mw": 0,
+        "current_ma": 0,
+        "reason": "透過 USB 介面提供穩定 5V 直流電源，適合低功耗模組供電。"
+      },
+      {
+        "type": "Battery-LiPo-class",
+        "name": "1S 1000mAh LiPo Battery",
+        "power_mw": 0,
+        "current_ma": 0,
+        "reason": "鋰聚合物電池，能量密度高，適合需要可攜式電源的專題。"
+      },
+      {
+        "type": "AC-Adapter-class",
+        "name": "AC-DC 5V 2A Adapter Module",
+        "power_mw": 10000,
+        "current_ma": 2000,
+        "reason": "將交流電轉換為穩定直流輸出，適合固定式高功耗設備供電。"
+      },
+      {
+        "type": "USB-Adapter-class",
+        "name": "USB 5V Power Adapter",
+        "power_mw": 5000,
+        "current_ma": 1000,
+        "reason": ""
+      }
+    ],
+    "Sensor": [
+      {
+        "type": "Sensor-Light-class",
+        "name": "LDR Photoresistor Module",
+        "power_mw": 3,
+        "current_ma": 1,
+        "reason": "光敏電阻感測環境亮度，可根據光線自動調整設備行為。"
+      },
+      {
+        "type": "Sensor-MSGEQ7-class",
+        "name": "MSGEQ7 Graphic Equalizer (7-band)",
+        "power_mw": 15,
+        "current_ma": 3,
+        "reason": ""
+      }
+    ],
+    "Output": [
+      {
+        "type": "Pump-Water-class",
+        "name": "Mini Submersible Water Pump 3-5V",
+        "power_mw": 1100,
+        "current_ma": 220,
+        "reason": "小型水泵，透過繼電器控制開關，用於自動澆水或水循環。"
+      },
+      {
+        "type": "Relay-Module-class",
+        "name": "5V Single Channel Relay Module",
+        "power_mw": 400,
+        "current_ma": 80,
+        "reason": "電磁繼電器，以低電壓控制高電壓迴路的通斷開關。"
+      },
+      {
+        "type": "L298N-Driver-class",
+        "name": "L298N Dual H-Bridge Motor Driver Module",
+        "power_mw": 3000,
+        "current_ma": 600,
+        "reason": ""
+      }
+    ]
+  },
+  "wiring": {
+    "SoilMoisture": {
+      "label": "土壤濕度感測器",
+      "pins": [
+        {
+          "comp": "VCC",
+          "mcu": "5V",
+          "color": "#ff4444",
+          "note": "",
+          "comp_dir": "power",
+          "comp_vd": "5V",
+          "mcu_dir": "power",
+          "mcu_vd": "5V"
+        },
+        {
+          "comp": "GND",
+          "mcu": "GND",
+          "color": "#333333",
+          "note": "",
+          "comp_dir": "gnd",
+          "comp_vd": "n/a",
+          "mcu_dir": "gnd",
+          "mcu_vd": "n/a"
+        },
+        {
+          "comp": "AO",
+          "mcu": "A0",
+          "color": "#44cc44",
+          "note": "類比輸出（0–1023）",
+          "passive": null,
+          "comp_dir": "analog_out",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "analog_in",
+          "mcu_vd": "logic_5V"
+        }
+      ],
+      "decoupling": [
+        {
+          "kind": "C",
+          "value": "100nF",
+          "topo": "decoupling",
+          "location": "onboard",
+          "purchasable": false,
+          "refdes": "C1",
+          "nets": [
+            "SoilMoisture.VCC",
+            "GND"
+          ]
+        }
+      ]
+    },
+    "TempHumid": {
+      "label": "DHT22 (AM2302) Temperature & Humidity Sensor",
+      "pins": [
+        {
+          "comp": "VCC",
+          "mcu": "5V",
+          "color": "#ff4444",
+          "note": "",
+          "comp_dir": "power",
+          "comp_vd": "5V",
+          "mcu_dir": "power",
+          "mcu_vd": "5V"
+        },
+        {
+          "comp": "GND",
+          "mcu": "GND",
+          "color": "#333333",
+          "note": "",
+          "comp_dir": "gnd",
+          "comp_vd": "n/a",
+          "mcu_dir": "gnd",
+          "mcu_vd": "n/a"
+        },
+        {
+          "comp": "DATA",
+          "mcu": "D2",
+          "color": "#44cc44",
+          "note": "數位輸出",
+          "passive": {
+            "kind": "R",
+            "value": "4.7kΩ",
+            "topo": "pullup",
+            "location": "external",
+            "purchasable": true,
+            "refdes": "R1",
+            "nets": [
+              "TempHumid.DATA",
+              "VCC"
+            ]
+          },
+          "comp_dir": "digital_out",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        }
+      ],
+      "decoupling": [
+        {
+          "kind": "C",
+          "value": "100nF",
+          "topo": "decoupling",
+          "location": "onboard",
+          "purchasable": false,
+          "refdes": "C2",
+          "nets": [
+            "TempHumid.VCC",
+            "GND"
+          ]
+        }
+      ]
+    },
+    "OLED": {
+      "label": "SSD1306 0.96-inch OLED Display Module (I2C)",
+      "pins": [
+        {
+          "comp": "VCC",
+          "mcu": "3.3V",
+          "color": "#ff4444",
+          "note": "",
+          "comp_dir": "power",
+          "comp_vd": "3V3",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        },
+        {
+          "comp": "GND",
+          "mcu": "GND",
+          "color": "#333333",
+          "note": "",
+          "comp_dir": "gnd",
+          "comp_vd": "n/a",
+          "mcu_dir": "gnd",
+          "mcu_vd": "n/a"
+        },
+        {
+          "comp": "SCL",
+          "mcu": "DA5",
+          "color": "#4488ff",
+          "note": "",
+          "passive": null,
+          "comp_dir": "i2c_bidir",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        },
+        {
+          "comp": "SDA",
+          "mcu": "DA4",
+          "color": "#ffaa00",
+          "note": "",
+          "passive": null,
+          "comp_dir": "i2c_bidir",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        }
+      ],
+      "decoupling": [
+        {
+          "kind": "C",
+          "value": "100nF",
+          "topo": "decoupling",
+          "location": "onboard",
+          "purchasable": false,
+          "refdes": "C3",
+          "nets": [
+            "OLED.VCC",
+            "GND"
+          ]
+        }
+      ]
+    }
+  },
+  "pin_allocation": {
+    "SoilMoisture": {
+      "AO": "A0"
+    },
+    "TempHumid": {
+      "DATA": 2
+    },
+    "OLED": {
+      "SDA": "A4",
+      "SCL": "A5"
+    }
+  },
+  "pin_labels": {
+    "SoilMoisture": "AO=A0",
+    "TempHumid": "DATA=D2",
+    "OLED": "SDA=DA4 / SCL=DA5"
+  },
+  "cad_output": {
+    "component_placements": [
+      {
+        "type": "Arduino-Uno-class",
+        "role": "Brain",
+        "x": 3.0,
+        "y": 3.0,
+        "L": 68.58,
+        "W": 53.34,
+        "H": 14.0,
+        "zone": "center",
+        "face_out": "side-front",
+        "enclosure_relation": "internal"
+      },
+      {
+        "type": "Sensor-TempHumid-class",
+        "role": "Sensor",
+        "x": 74.6,
+        "y": 3.0,
+        "L": 25.1,
+        "W": 15.1,
+        "H": 7.7,
+        "zone": "face-edge",
+        "face_out": "top",
+        "enclosure_relation": "internal"
+      },
+      {
+        "type": "Display-OLED-class",
+        "role": "Output",
+        "x": 3.0,
+        "y": 62.3,
+        "L": 27.0,
+        "W": 27.0,
+        "H": 4.0,
+        "zone": "bottom-center",
+        "face_out": "side-left",
+        "enclosure_relation": "internal"
+      }
+    ],
+    "panel_placements": [],
+    "external_refs": [
+      {
+        "type": "Battery-AA-class",
+        "role": "Power",
+        "wire_exit_face": "side-back",
+        "wire_exit_u": 64.7,
+        "wire_exit_v": 0.0,
+        "wire_exit_diameter": 6.0,
+        "enclosure_relation": "external"
+      },
+      {
+        "type": "Sensor-SoilMoisture-class",
+        "role": "Sensor",
+        "wire_exit_face": "side-back",
+        "wire_exit_u": 64.7,
+        "wire_exit_v": 0.0,
+        "wire_exit_diameter": 6.0,
+        "enclosure_relation": "external"
+      }
+    ],
+    "embedded_refs": [],
+    "thermal_field": {
+      "heat_sources": [
+        {
+          "type": "Arduino-Uno-class",
+          "power_mw": 250.0,
+          "estimated": false,
+          "spatial_kind": "point",
+          "estimation_source": "datasheet",
+          "user_confirmed": false
+        },
+        {
+          "type": "Sensor-TempHumid-class",
+          "power_mw": 12.5,
+          "estimated": false,
+          "spatial_kind": "point",
+          "estimation_source": "datasheet",
+          "user_confirmed": false
+        },
+        {
+          "type": "Display-OLED-class",
+          "power_mw": 100.0,
+          "estimated": false,
+          "spatial_kind": "point",
+          "estimation_source": "datasheet",
+          "user_confirmed": false
+        }
+      ],
+      "total_power_mw": 362.5,
+      "thermal_tier": "LOW",
+      "needs_venting": false,
+      "passive_venting": false,
+      "vent_placements": [],
+      "thermal_overlay": {
+        "heat_sources": [
+          {
+            "type": "Arduino-Uno-class",
+            "position": [
+              3.0,
+              3.0,
+              0.0
+            ],
+            "surface_temp_c": 28.3,
+            "influence_radius_mm": 22.4,
+            "thermal_mw": 250.0
+          },
+          {
+            "type": "Sensor-TempHumid-class",
+            "position": [
+              74.58,
+              3.0,
+              0.0
+            ],
+            "surface_temp_c": 26.3,
+            "influence_radius_mm": 5.0,
+            "thermal_mw": 12.5
+          },
+          {
+            "type": "Display-OLED-class",
+            "position": [
+              3.0,
+              62.34,
+              0.0
+            ],
+            "surface_temp_c": 32.6,
+            "influence_radius_mm": 14.1,
+            "thermal_mw": 100.0
+          }
+        ],
+        "ambient_c": 25.0,
+        "estimated_dt_c": 1.5,
+        "color_lut": [
+          {
+            "temp_c": 25,
+            "color": "#0000ff"
+          },
+          {
+            "temp_c": 35,
+            "color": "#00ff00"
+          },
+          {
+            "temp_c": 50,
+            "color": "#ff0000"
+          }
+        ]
+      }
+    },
+    "wire_routes": [
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Display-OLED-class",
+        "waypoints": [
+          [
+            23.6,
+            4.0,
+            14.0
+          ],
+          [
+            23.6,
+            0.0,
+            14.0
+          ],
+          [
+            23.6,
+            0.0,
+            17.0
+          ],
+          [
+            0.0,
+            75.8,
+            17.0
+          ],
+          [
+            0.0,
+            75.8,
+            4.0
+          ],
+          [
+            8.4,
+            75.8,
+            4.0
+          ]
+        ],
+        "signal_type": "power",
+        "layer_z": 17.0,
+        "routed_length_mm": 107.8,
+        "color": "#ff4444",
+        "mcu_pin": "3.3V",
+        "comp_pin": "VCC"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Sensor-SoilMoisture-class",
+        "waypoints": [
+          [
+            27.0,
+            4.0,
+            14.0
+          ],
+          [
+            27.0,
+            0.0,
+            14.0
+          ],
+          [
+            27.0,
+            0.0,
+            17.0
+          ],
+          [
+            35.3,
+            0.0,
+            17.0
+          ],
+          [
+            35.3,
+            0.0,
+            3.5
+          ],
+          [
+            35.3,
+            11.5,
+            3.5
+          ]
+        ],
+        "signal_type": "power",
+        "layer_z": 17.0,
+        "routed_length_mm": 40.3,
+        "color": "#ff4444",
+        "mcu_pin": "5V",
+        "comp_pin": "VCC"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Sensor-TempHumid-class",
+        "waypoints": [
+          [
+            27.0,
+            4.0,
+            14.0
+          ],
+          [
+            27.0,
+            0.0,
+            14.0
+          ],
+          [
+            27.0,
+            0.0,
+            17.0
+          ],
+          [
+            71.6,
+            10.6,
+            17.0
+          ],
+          [
+            71.6,
+            10.6,
+            7.7
+          ],
+          [
+            79.6,
+            10.6,
+            7.7
+          ]
+        ],
+        "signal_type": "power",
+        "layer_z": 17.0,
+        "routed_length_mm": 70.1,
+        "color": "#ff4444",
+        "mcu_pin": "5V",
+        "comp_pin": "VCC"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Display-OLED-class",
+        "waypoints": [
+          [
+            20.1,
+            4.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            19.0
+          ],
+          [
+            0.0,
+            75.8,
+            19.0
+          ],
+          [
+            0.0,
+            75.8,
+            4.0
+          ],
+          [
+            13.8,
+            75.8,
+            4.0
+          ]
+        ],
+        "signal_type": "gnd",
+        "layer_z": 19.0,
+        "routed_length_mm": 116.2,
+        "color": "#333333",
+        "mcu_pin": "GND",
+        "comp_pin": "GND"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Sensor-SoilMoisture-class",
+        "waypoints": [
+          [
+            20.1,
+            4.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            19.0
+          ],
+          [
+            64.7,
+            0.0,
+            19.0
+          ],
+          [
+            64.7,
+            0.0,
+            3.5
+          ],
+          [
+            64.7,
+            11.5,
+            3.5
+          ]
+        ],
+        "signal_type": "gnd",
+        "layer_z": 19.0,
+        "routed_length_mm": 80.6,
+        "color": "#333333",
+        "mcu_pin": "GND",
+        "comp_pin": "GND"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Sensor-TempHumid-class",
+        "waypoints": [
+          [
+            20.1,
+            4.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            19.0
+          ],
+          [
+            87.1,
+            0.0,
+            19.0
+          ],
+          [
+            87.1,
+            0.0,
+            7.7
+          ],
+          [
+            87.1,
+            10.6,
+            7.7
+          ]
+        ],
+        "signal_type": "gnd",
+        "layer_z": 19.0,
+        "routed_length_mm": 97.9,
+        "color": "#333333",
+        "mcu_pin": "GND",
+        "comp_pin": "GND"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Display-OLED-class",
+        "waypoints": [
+          [
+            37.3,
+            29.7,
+            14.0
+          ],
+          [
+            37.3,
+            0.0,
+            14.0
+          ],
+          [
+            37.3,
+            0.0,
+            21.0
+          ],
+          [
+            33.0,
+            75.8,
+            21.0
+          ],
+          [
+            33.0,
+            75.8,
+            4.0
+          ],
+          [
+            19.2,
+            75.8,
+            4.0
+          ]
+        ],
+        "signal_type": "digital",
+        "layer_z": 21.0,
+        "routed_length_mm": 143.4,
+        "color": "#44cc44",
+        "mcu_pin": "DA5",
+        "comp_pin": "SCL"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Display-OLED-class",
+        "waypoints": [
+          [
+            37.3,
+            29.7,
+            14.0
+          ],
+          [
+            37.3,
+            0.0,
+            14.0
+          ],
+          [
+            37.3,
+            0.0,
+            21.0
+          ],
+          [
+            33.0,
+            75.8,
+            21.0
+          ],
+          [
+            33.0,
+            75.8,
+            4.0
+          ],
+          [
+            24.6,
+            75.8,
+            4.0
+          ]
+        ],
+        "signal_type": "digital",
+        "layer_z": 21.0,
+        "routed_length_mm": 138.0,
+        "color": "#44cc44",
+        "mcu_pin": "DA4",
+        "comp_pin": "SDA"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Sensor-SoilMoisture-class",
+        "waypoints": [
+          [
+            37.3,
+            4.0,
+            14.0
+          ],
+          [
+            37.3,
+            0.0,
+            14.0
+          ],
+          [
+            37.3,
+            0.0,
+            23.0
+          ],
+          [
+            94.1,
+            0.0,
+            23.0
+          ],
+          [
+            94.1,
+            0.0,
+            3.5
+          ],
+          [
+            94.1,
+            11.5,
+            3.5
+          ]
+        ],
+        "signal_type": "analog",
+        "layer_z": 23.0,
+        "routed_length_mm": 100.8,
+        "color": "#ffaa00",
+        "mcu_pin": "A0",
+        "comp_pin": "AO"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Sensor-TempHumid-class",
+        "waypoints": [
+          [
+            29.9,
+            55.3,
+            14.0
+          ],
+          [
+            29.9,
+            59.3,
+            14.0
+          ],
+          [
+            29.9,
+            59.3,
+            21.0
+          ],
+          [
+            102.7,
+            10.6,
+            21.0
+          ],
+          [
+            102.7,
+            10.6,
+            7.7
+          ],
+          [
+            94.7,
+            10.6,
+            7.7
+          ]
+        ],
+        "signal_type": "digital",
+        "layer_z": 21.0,
+        "routed_length_mm": 119.9,
+        "color": "#44cc44",
+        "mcu_pin": "D2",
+        "comp_pin": "DATA"
+      }
+    ],
+    "decisions": [
+      {
+        "step": "enclosure_partition",
+        "principle": "殼體關係分流",
+        "description": "依 enclosure_relation 分流 5 元件：pack(internal+breadboard)=3, panel=0, external=2, embedded=0。Pack 元件參與殼內 packing，panel 元件分配殼面，external/embedded 僅作走線 endpoint。",
+        "formula": "bucket = ComponentSpec.enclosure_relation",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "gravity_sort",
+        "principle": "重心穩定",
+        "description": "依重量排序 3 個元件（總重 31g）。最重：Arduino-Uno (25g)，優先放置於底部。",
+        "formula": "placement_priority = sorted(components, key=weight_g, desc)",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "thermal_classify",
+        "principle": "熱源隔離",
+        "description": "功耗 > 500mW 的熱源：無。需與 1 個感測器保持距離，避免溫度影響量測精度。",
+        "formula": "hot_threshold = 500 mW",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "zone_assign",
+        "principle": "功能分區",
+        "description": "依角色分區：Arduino-Uno→center; Sensor-TempHumid→face-edge; Display-OLED→bottom-center。Brain 居中便於走線輻射，感測器靠外壁便於開窗，熱源置底利用自然對流散熱。",
+        "formula": "zone = f(role, is_hot)",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "shelf_pack",
+        "principle": "空間最佳化",
+        "description": "First-Fit Decreasing shelf packing：3 元件排入 129x97mm 空間，面積利用率 38%。元件間距 3mm 確保組裝空間與走線通道。",
+        "formula": "utilization = 4766 / 12552 = 38%",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "collision_check",
+        "principle": "干涉防護（PV2）",
+        "description": "無碰撞：3 個元件 3D AABB 無重疊 ✓",
+        "formula": "",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "cog_check",
+        "principle": "重心穩定（PV4）",
+        "description": "重心 (40.1, 32.3) 位於底座中央 2/3 區域內 （中心 64.7, 48.5）✓",
+        "formula": "CoG ∈ [L/6, 5L/6] × [W/6, 5W/6]",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "port_orient",
+        "principle": "介面可達性",
+        "description": "Port 朝向最近外壁：Arduino-Uno USB→side-front; Sensor-TempHumid→top。USB/電源口朝外便於插拔，感測器朝上或朝外便於偵測。",
+        "formula": "face_out = argmin(distance_to_wall)",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "wire_route",
+        "principle": "多層 3D 走線（pin-to-pin + riser + layer separation）",
+        "description": "3D A* 完成 10 條走線（10 條 pin-to-pin），分佈於 4 層 Z 平面，總長度 1015mm。各訊號類型佔獨立 Z 層避免交叉；同層走線互為障礙物避免重疊。",
+        "formula": "path = A*(pin_pos, obstacles ∪ same_layer_wires); z = f(signal_type)",
+        "6e_stage": "explain"
+      },
+      {
+        "step": "thermal_validate",
+        "principle": "散熱設計",
+        "description": "總熱功率 362mW，Tier=LOW。密閉殼估算溫升 dT~1.5°C。< 500mW，密閉殼自然散熱即可。",
+        "formula": "dT = P / (h·A_shell) = 0.36 / (7.0×0.0342) = 1.5°C",
+        "6e_stage": "explain"
+      }
+    ],
+    "spec": {
+      "inner_length": 129.4,
+      "inner_width": 97.0,
+      "inner_height": 20.0,
+      "wall": 2.0,
+      "tol": 0.3
+    },
+    "engine": "build123d",
+    "scene_graph_v3": {
+      "version": "3.0",
+      "coordinate_system": "y-up",
+      "enclosure": {
+        "inner": [
+          129.4,
+          97.0,
+          20.0
+        ],
+        "wall": 2.0,
+        "holes": [
+          {
+            "face": "x+",
+            "center": [
+              64.7,
+              19.0,
+              -2.7
+            ],
+            "diameter": 6.0,
+            "comp_type": "Sensor-SoilMoisture-class",
+            "wire_id": "w0"
+          },
+          {
+            "face": "x+",
+            "center": [
+              64.7,
+              19.0,
+              -21.1
+            ],
+            "diameter": 6.0,
+            "comp_type": "Sensor-SoilMoisture-class",
+            "wire_id": "w1"
+          },
+          {
+            "face": "x+",
+            "center": [
+              64.7,
+              19.0,
+              -26.1
+            ],
+            "diameter": 6.0,
+            "comp_type": "Sensor-SoilMoisture-class",
+            "wire_id": "w2"
+          }
+        ],
+        "face_cutouts": [],
+        "meshes": []
+      },
+      "modules": [
+        {
+          "id": "arduino-uno-0",
+          "comp_type": "Arduino-Uno-class",
+          "role": "Brain",
+          "position": [
+            -25.4,
+            0.0,
+            -16.8
+          ],
+          "dimensions": [
+            72.58,
+            57.34,
+            16.0
+          ],
+          "enclosure_relation": "internal",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Arduino-Uno-class/stl?variant=pcb_body",
+              "format": "glb"
+            },
+            {
+              "variant": "base",
+              "url": "/api/shells/Arduino-Uno-class/stl?variant=base",
+              "format": "glb"
+            },
+            {
+              "variant": "lid",
+              "url": "/api/shells/Arduino-Uno-class/stl?variant=lid",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "USB-B",
+              "world": [
+                -63.7,
+                2.0,
+                -7.4
+              ],
+              "port_type": "USB",
+              "side": "left",
+              "width": 12.0,
+              "height": 11.0,
+              "pins": [
+                "USB-B"
+              ]
+            },
+            {
+              "name": "DC-Jack",
+              "world": [
+                -63.7,
+                1.0,
+                -37.1
+              ],
+              "port_type": "PWR",
+              "side": "left",
+              "width": 9.0,
+              "height": 11.0,
+              "pins": [
+                "DC-Jack"
+              ]
+            },
+            {
+              "name": "Power-Header",
+              "world": [
+                -24.9,
+                0.0,
+                -43.0
+              ],
+              "port_type": "PWR",
+              "side": "face",
+              "width": 22.319999999999997,
+              "height": 4.54,
+              "pins": [
+                "NC",
+                "IOREF",
+                "RESET",
+                "+3V3",
+                "+5V",
+                "GND",
+                "GND",
+                "VIN"
+              ]
+            },
+            {
+              "name": "Analog-A0~A5",
+              "world": [
+                -4.6,
+                0.0,
+                -43.0
+              ],
+              "port_type": "ANALOG",
+              "side": "face",
+              "width": 17.240000000000002,
+              "height": 4.54,
+              "pins": [
+                "A0",
+                "A1",
+                "A2",
+                "A3",
+                "A4/SDA",
+                "A5/SCL"
+              ]
+            },
+            {
+              "name": "Digital-D0~D7",
+              "world": [
+                -7.1,
+                0.0,
+                5.3
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 22.32,
+              "height": 4.54,
+              "pins": [
+                "D0",
+                "D1",
+                "D2",
+                "D3",
+                "D4",
+                "D5",
+                "D6",
+                "D7"
+              ]
+            },
+            {
+              "name": "Digital-D8~SCL",
+              "world": [
+                -31.5,
+                0.0,
+                5.3
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 27.4,
+              "height": 4.54,
+              "pins": [
+                "D8",
+                "D9",
+                "SS",
+                "MOSI",
+                "MISO",
+                "SCK",
+                "GND",
+                "AREF",
+                "A4/SDA(dup)",
+                "A5/SCL(dup)"
+              ]
+            },
+            {
+              "name": "ICSP",
+              "world": [
+                3.2,
+                0.0,
+                -17.6
+              ],
+              "port_type": "SPI",
+              "side": "face",
+              "width": 7.079999999999999,
+              "height": 9.620000000000001,
+              "pins": [
+                "MISO",
+                "+5V",
+                "SCK",
+                "MOSI",
+                "RESET",
+                "GND"
+              ]
+            }
+          ],
+          "thermal_mw": 250.0
+        },
+        {
+          "id": "battery-aa-1",
+          "comp_type": "Battery-AA-class",
+          "role": "Power",
+          "position": [
+            102.2,
+            0.0,
+            -29.5
+          ],
+          "dimensions": [
+            59.0,
+            32.0,
+            15.0
+          ],
+          "enclosure_relation": "external",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Battery-AA-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "Wire-Exit",
+              "world": [
+                101.2,
+                0.0,
+                -45.5
+              ],
+              "port_type": "PWR",
+              "side": "face",
+              "width": 6.0,
+              "height": 4.0,
+              "pins": [
+                "Wire-Exit"
+              ]
+            }
+          ],
+          "thermal_mw": 0.0
+        },
+        {
+          "id": "sensor-soilmoisture-2",
+          "comp_type": "Sensor-SoilMoisture-class",
+          "role": "Sensor",
+          "position": [
+            121.7,
+            0.0,
+            1.0
+          ],
+          "dimensions": [
+            98.0,
+            23.0,
+            3.5
+          ],
+          "enclosure_relation": "external",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Sensor-SoilMoisture-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "AOUT",
+              "world": [
+                165.7,
+                0.0,
+                -1.5
+              ],
+              "port_type": "ANALOG",
+              "side": "face",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "AOUT"
+              ]
+            },
+            {
+              "name": "VCC",
+              "world": [
+                165.7,
+                0.0,
+                1.0
+              ],
+              "port_type": "PWR",
+              "side": "face",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "VCC"
+              ]
+            },
+            {
+              "name": "GND",
+              "world": [
+                165.7,
+                0.0,
+                3.5
+              ],
+              "port_type": "GND",
+              "side": "face",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "GND"
+              ]
+            }
+          ],
+          "thermal_mw": 16.5
+        },
+        {
+          "id": "sensor-temphumid-3",
+          "comp_type": "Sensor-TempHumid-class",
+          "role": "Sensor",
+          "position": [
+            21.4,
+            0.0,
+            -33.0
+          ],
+          "dimensions": [
+            15.1,
+            25.1,
+            7.7
+          ],
+          "enclosure_relation": "internal",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Sensor-TempHumid-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "4Pin-Header",
+              "world": [
+                27.7,
+                0.0,
+                -33.2
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 4.54,
+              "height": 12.16,
+              "pins": [
+                "VCC",
+                "Data",
+                "NC",
+                "GND"
+              ]
+            }
+          ],
+          "thermal_mw": 12.5
+        },
+        {
+          "id": "display-oled-4",
+          "comp_type": "Display-OLED-class",
+          "role": "Output",
+          "position": [
+            -48.2,
+            0.0,
+            28.3
+          ],
+          "dimensions": [
+            27.0,
+            27.0,
+            4.0
+          ],
+          "enclosure_relation": "internal",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Display-OLED-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "I2C-Header",
+              "world": [
+                -49.4,
+                0.0,
+                39.8
+              ],
+              "port_type": "I2C",
+              "side": "face",
+              "width": 12.16,
+              "height": 4.54,
+              "pins": [
+                "GND",
+                "VCC",
+                "SCL",
+                "SDA"
+              ]
+            }
+          ],
+          "thermal_mw": 100.0
+        }
+      ],
+      "wires": [
+        {
+          "id": "w0",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "USB-B",
+            "pin": "5V"
+          },
+          "to": {
+            "module": "sensor-soilmoisture-2",
+            "port": "VCC",
+            "pin": "VCC"
+          },
+          "signal": "power",
+          "color": "#ff4444",
+          "path3d": [
+            [
+              -63.7,
+              2.0,
+              -7.4
+            ],
+            [
+              -63.7,
+              19.0,
+              -7.4
+            ],
+            [
+              64.7,
+              19.0,
+              1.0
+            ],
+            [
+              165.7,
+              0.0,
+              1.0
+            ]
+          ],
+          "style": "catmull-rom",
+          "crosses_wall": true
+        },
+        {
+          "id": "w1",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Power-Header",
+            "pin": "GND"
+          },
+          "to": {
+            "module": "sensor-soilmoisture-2",
+            "port": "GND",
+            "pin": "GND"
+          },
+          "signal": "gnd",
+          "color": "#333333",
+          "path3d": [
+            [
+              -24.9,
+              0.0,
+              -43.0
+            ],
+            [
+              -24.9,
+              19.0,
+              -43.0
+            ],
+            [
+              64.7,
+              19.0,
+              3.5
+            ],
+            [
+              165.7,
+              0.0,
+              3.5
+            ]
+          ],
+          "style": "catmull-rom",
+          "crosses_wall": true
+        },
+        {
+          "id": "w2",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Analog-A0~A5",
+            "pin": "A0"
+          },
+          "to": {
+            "module": "sensor-soilmoisture-2",
+            "port": "AOUT",
+            "pin": "AO"
+          },
+          "signal": "analog",
+          "color": "#ffaa00",
+          "path3d": [
+            [
+              -4.6,
+              0.0,
+              -43.0
+            ],
+            [
+              -4.6,
+              19.0,
+              -43.0
+            ],
+            [
+              64.7,
+              19.0,
+              -1.5
+            ],
+            [
+              165.7,
+              0.0,
+              -1.5
+            ]
+          ],
+          "style": "catmull-rom",
+          "crosses_wall": true
+        },
+        {
+          "id": "w3",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "USB-B",
+            "pin": "5V"
+          },
+          "to": {
+            "module": "sensor-temphumid-3",
+            "port": "4Pin-Header",
+            "pin": "VCC"
+          },
+          "signal": "power",
+          "color": "#ff4444",
+          "path3d": [
+            [
+              -63.7,
+              2.0,
+              -7.4
+            ],
+            [
+              -63.7,
+              19.0,
+              -7.4
+            ],
+            [
+              27.7,
+              19.0,
+              -33.2
+            ],
+            [
+              27.7,
+              0.0,
+              -33.2
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w4",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Power-Header",
+            "pin": "GND"
+          },
+          "to": {
+            "module": "sensor-temphumid-3",
+            "port": "4Pin-Header",
+            "pin": "GND"
+          },
+          "signal": "gnd",
+          "color": "#333333",
+          "path3d": [
+            [
+              -24.9,
+              0.0,
+              -43.0
+            ],
+            [
+              -24.9,
+              19.0,
+              -43.0
+            ],
+            [
+              27.7,
+              19.0,
+              -33.2
+            ],
+            [
+              27.7,
+              0.0,
+              -33.2
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w5",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Digital-D0~D7",
+            "pin": "D2"
+          },
+          "to": {
+            "module": "sensor-temphumid-3",
+            "port": "4Pin-Header",
+            "pin": "DATA"
+          },
+          "signal": "digital",
+          "color": "#44cc44",
+          "path3d": [
+            [
+              -7.1,
+              0.0,
+              5.3
+            ],
+            [
+              -7.1,
+              19.0,
+              5.3
+            ],
+            [
+              27.7,
+              19.0,
+              -33.2
+            ],
+            [
+              27.7,
+              0.0,
+              -33.2
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w6",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "USB-B",
+            "pin": "3.3V"
+          },
+          "to": {
+            "module": "display-oled-4",
+            "port": "I2C-Header",
+            "pin": "VCC"
+          },
+          "signal": "power",
+          "color": "#ff4444",
+          "path3d": [
+            [
+              -63.7,
+              2.0,
+              -7.4
+            ],
+            [
+              -63.7,
+              19.0,
+              -7.4
+            ],
+            [
+              -49.4,
+              19.0,
+              39.8
+            ],
+            [
+              -49.4,
+              0.0,
+              39.8
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w7",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Power-Header",
+            "pin": "GND"
+          },
+          "to": {
+            "module": "display-oled-4",
+            "port": "I2C-Header",
+            "pin": "GND"
+          },
+          "signal": "gnd",
+          "color": "#333333",
+          "path3d": [
+            [
+              -24.9,
+              0.0,
+              -43.0
+            ],
+            [
+              -24.9,
+              19.0,
+              -43.0
+            ],
+            [
+              -49.4,
+              19.0,
+              39.8
+            ],
+            [
+              -49.4,
+              0.0,
+              39.8
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w8",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "USB-B",
+            "pin": "DA5"
+          },
+          "to": {
+            "module": "display-oled-4",
+            "port": "I2C-Header",
+            "pin": "SCL"
+          },
+          "signal": "digital",
+          "color": "#44cc44",
+          "path3d": [
+            [
+              -63.7,
+              2.0,
+              -7.4
+            ],
+            [
+              -63.7,
+              19.0,
+              -7.4
+            ],
+            [
+              -49.4,
+              19.0,
+              39.8
+            ],
+            [
+              -49.4,
+              0.0,
+              39.8
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w9",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "USB-B",
+            "pin": "DA4"
+          },
+          "to": {
+            "module": "display-oled-4",
+            "port": "I2C-Header",
+            "pin": "SDA"
+          },
+          "signal": "digital",
+          "color": "#44cc44",
+          "path3d": [
+            [
+              -63.7,
+              2.0,
+              -7.4
+            ],
+            [
+              -63.7,
+              19.0,
+              -7.4
+            ],
+            [
+              -49.4,
+              19.0,
+              39.8
+            ],
+            [
+              -49.4,
+              0.0,
+              39.8
+            ]
+          ],
+          "style": "catmull-rom"
+        }
+      ],
+      "thermal_field": {
+        "heat_sources": [
+          {
+            "type": "Arduino-Uno-class",
+            "power_mw": 250.0
+          },
+          {
+            "type": "Sensor-SoilMoisture-class",
+            "power_mw": 16.5
+          },
+          {
+            "type": "Sensor-TempHumid-class",
+            "power_mw": 12.5
+          },
+          {
+            "type": "Display-OLED-class",
+            "power_mw": 100.0
+          }
+        ],
+        "total_power_mw": 379.0,
+        "needs_venting": false,
+        "vent_placements": [],
+        "estimated_dt_c": 5.4
+      },
+      "decisions": [
+        "Enclosure auto-sized to 129.4x97.0x20.0mm inner, fitting 3 packed modules",
+        "3D A* routed 10 wires (grid 3mm, 6-dir, turn penalty 2.0)",
+        "Thermal: 379.0mW, vent=False, dT~5.4C",
+        "CoG: off-centre at [125.7, 25.9]",
+        "Reserved 3 wall hole(s) for external wiring",
+        "Validation: all checks passed"
+      ],
+      "validation": {
+        "passed": true,
+        "checks_run": 5,
+        "checks_passed": 5,
+        "issues": []
+      }
+    }
+  }
+}

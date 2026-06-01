@@ -1,0 +1,14 @@
+{
+  "scan": "fallback-scan",
+  "findings": [
+    {
+      "id": "F1",
+      "title": "build_threejs_html 缺 inner_* 時靜默回 0",
+      "file": "lib/cad/_phase5_threejs.py",
+      "line": 159,
+      "verdict": "confirm",
+      "evidence_bytes": "inner_l = dims.get(\"inner_length\", 0.0)  # 缺值靜默頂替 0",
+      "reachability_path": ["phase5_handler()", "build_threejs_html()", "dims.get(inner_length)"]
+    }
+  ]
+}

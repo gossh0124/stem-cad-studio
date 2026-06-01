@@ -1,0 +1,25 @@
+{
+  "schema_version": "2.0",
+  "manifest_version": 1,
+  "created": "2026-05-27",
+  "purpose": "Index of per-class verified datasheet files. Populated incrementally per Arduino試點 → expansion plan (see docs/ssot_arduino_pilot/PLAN_P0_P9.md).",
+  "pilot_status": "Pilot-0 (setup) in progress",
+  "classes_migrated": [],
+  "classes_pending": [
+    "Arduino-Uno-class",
+    "ESP32-class",
+    "Microbit-class",
+    "RaspberryPi-class",
+    "Sensor-Ultrasonic-class",
+    "Sensor-TempHumid-class",
+    "Sensor-PIR-class",
+    "Display-OLED-class",
+    "Display-LCD-class",
+    "Relay-Module-class"
+  ],
+  "classes_not_yet_planned": "33 additional classes — see expansion plan (Pilot-9.4)",
+  "legacy_monolithic_file": {
+    "path": "data/component_datasheet_verified.json",
+    "status": "active — readers still point here; will be deprecated post-Pilot-9 only after all 44 classes migrated"
+  }
+}

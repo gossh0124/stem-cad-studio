@@ -1,0 +1,7 @@
+# Force LF line endings for shell scripts (WSL2/Linux exec must be LF)
+*.sh text eol=lf
+
+# VERLEDGER: 穩定 EOL 上下文（blob SHA / eol_context 判定）
+*.py text eol=lf
+*.md text eol=lf
+*.js text eol=lf

@@ -1,0 +1,12 @@
+{
+  "scan": "fallback-scan",
+  "findings": [
+    {
+      "id": "F3",
+      "title": "無法以證據確認的疑點(誠實逃生口)",
+      "verdict": "cannot_confirm",
+      "evidence_bytes": "",
+      "reachability_path": []
+    }
+  ]
+}

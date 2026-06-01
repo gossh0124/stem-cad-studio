@@ -1,0 +1,116 @@
+{
+  "_doc": "Component 3D model registry — maps shape+params → model file path",
+  "_format": "key = shape type, value = array of variant configs",
+  "_generated_from": "Scanned 72 component-dimensions entries (2026-05-19)",
+  "_total_models": 47,
+
+  "ic-dip": [
+    { "pins": 8,  "pitch": 2.54, "rows": 2, "file": "ic-dip/dip-8-254.step" },
+    { "pins": 15, "pitch": 2.54, "rows": 2, "file": "ic-dip/dip-15-254.step" },
+    { "pins": 16, "pitch": 2.54, "rows": 2, "file": "ic-dip/dip-16-254.step" },
+    { "pins": 28, "pitch": 2.54, "rows": 2, "file": "ic-dip/dip-28-254.step" }
+  ],
+  "ic-soic": [
+    { "pins": 0,  "file": "ic-soic/soic-generic.step", "_note": "no pin count specified, use size-based" },
+    { "pins": 8,  "file": "ic-soic/soic-8.step" }
+  ],
+  "ic-qfp": [
+    { "pins": 28, "file": "ic-qfp/qfp-28.step" },
+    { "pins": 32, "file": "ic-qfp/qfp-32.step" },
+    { "pins": 64, "file": "ic-qfp/qfp-64.step" }
+  ],
+  "ic-module": [
+    { "file": "ic-module/esp-wroom32.step", "_note": "ESP-WROOM-32 specific" }
+  ],
+
+  "conn-header-male": [
+    { "pins": 1,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-1x1-254.step" },
+    { "pins": 2,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-2x1-254.step" },
+    { "pins": 2,  "pitch": 4.0,  "rows": 1, "file": "conn-header-male/header-2x1-400.step" },
+    { "pins": 3,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-3x1-254.step" },
+    { "pins": 3,  "pitch": 3.5,  "rows": 1, "file": "conn-header-male/header-3x1-350.step" },
+    { "pins": 3,  "pitch": 4.0,  "rows": 1, "file": "conn-header-male/header-3x1-400.step" },
+    { "pins": 4,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-4x1-254.step" },
+    { "pins": 5,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-5x1-254.step" },
+    { "pins": 6,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-6x1-254.step" },
+    { "pins": 6,  "pitch": 2.54, "rows": 2, "file": "conn-header-male/header-6x2-254.step" },
+    { "pins": 8,  "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-8x1-254.step" },
+    { "pins": 19, "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-19x1-254.step" },
+    { "pins": 26, "pitch": 2.54, "rows": 1, "file": "conn-header-male/header-26x1-254.step" },
+    { "pins": 40, "pitch": 2.54, "rows": 2, "file": "conn-header-male/header-40x2-254.step" }
+  ],
+  "conn-header-female": [
+    { "pins": 5,  "pitch": 2.54, "rows": 1, "file": "conn-header-female/female-5x1-254.step" },
+    { "pins": 6,  "pitch": 2.54, "rows": 1, "file": "conn-header-female/female-6x1-254.step" },
+    { "pins": 8,  "pitch": 2.54, "rows": 1, "file": "conn-header-female/female-8x1-254.step" },
+    { "pins": 10, "pitch": 2.54, "rows": 1, "file": "conn-header-female/female-10x1-254.step" }
+  ],
+  "conn-usb-micro": [
+    { "file": "conn-usb-micro/usb-micro-b.step" }
+  ],
+  "conn-usb-c": [
+    { "file": "conn-usb-c/usb-type-c.step" }
+  ],
+  "conn-usb-b": [
+    { "file": "conn-usb-b/usb-type-a-socket.step" }
+  ],
+  "conn-screw-terminal": [
+    { "pins": 2, "pitch": 5.08, "file": "conn-screw-terminal/screw-2-508.step" },
+    { "pins": 3, "pitch": 5.08, "file": "conn-screw-terminal/screw-3-508.step" }
+  ],
+  "conn-barrel-jack": [
+    { "file": "conn-barrel-jack/barrel-dc-5521.step" }
+  ],
+
+  "relay": [
+    { "file": "relay/srd-05vdc-sl-c.step" }
+  ],
+  "button-tactile": [
+    { "file": "button-tactile/tact-6x6.step" }
+  ],
+  "pot-trimmer": [
+    { "file": "pot-trimmer/trimmer-3296w.step" }
+  ],
+  "pot-shaft": [
+    { "file": "pot-shaft/pot-rv09.step" }
+  ],
+  "led-tht": [
+    { "file": "led-tht/led-5mm.step" }
+  ],
+  "led-smd": [
+    { "file": "led-smd/led-0805.step" }
+  ],
+  "cap-electrolytic": [
+    { "file": "cap-electrolytic/cap-elec-8x12.step" }
+  ],
+  "cap-ceramic": [
+    { "file": "cap-ceramic/cap-ceramic-0805.step" }
+  ],
+  "res-smd": [
+    { "file": "res-smd/res-0805.step" }
+  ],
+  "crystal-hc49": [
+    { "file": "crystal-hc49/hc49s.step" }
+  ],
+  "buzzer": [
+    { "file": "buzzer/buzzer-12mm.step" }
+  ],
+  "motor-dc": [
+    { "file": "motor-dc/fa130-gearbox.step" }
+  ],
+  "motor-servo": [
+    { "file": "motor-servo/sg90.step" }
+  ],
+  "motor-stepper": [
+    { "file": "motor-stepper/28byj-48.step" }
+  ],
+  "vreg-to220": [
+    { "file": "vreg-to220/to220-3pin.step" }
+  ],
+  "sensor-dome": [
+    { "file": "sensor-dome/pir-dome.step" }
+  ],
+  "mounting-hole": [
+    { "file": "mounting-hole/m3-hole.step" }
+  ]
+}

@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://stemai/schemas/verified-class-v2.json",
+  "title": "Verified Class Datasheet (v2 — Arduino Pilot Subset)",
+  "description": "Schema for per-class verified datasheet files under data/verified/{boards,modules}/{class}.json. Pilot-0 draft covering only the fields Arduino試點 will exercise; will grow when expansion (Pilot-9 後) starts.",
+  "type": "object",
+  "required": ["schema_version", "class_name", "_provenance_summary", "physical"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "2.0",
+      "description": "Pilot-0 baseline. v1.1 is the transitional schema used in Pilot-4 (split file but no per-field provenance yet)."
+    },
+    "class_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*-class$",
+      "examples": ["Arduino-Uno-class"]
+    },
+    "_provenance_summary": {
+      "type": "object",
+      "required": ["tier_A_fields", "tier_B_fields", "tier_C_fields", "verified_date", "verifier"],
+      "properties": {
+        "tier_A_fields": {"type": "integer", "minimum": 0},
+        "tier_B_fields": {"type": "integer", "minimum": 0},
+        "tier_C_fields_in_libpcb": {
+          "type": "integer", "minimum": 0,
+          "description": "Count of tier-C fields that stay in lib/pcb (NOT in this file). Recorded for traceability."
+        },
+        "verified_date": {"type": "string", "format": "date"},
+        "verifier": {"type": "string"},
+        "audit_csv": {
+          "type": "string",
+          "description": "Relative path to the per-field audit CSV that justifies tier assignments.",
+          "examples": ["docs/ssot_arduino_pilot/01_field_audit.csv"]
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "manufacturer": {"type": "string"},
+        "part_number": {"type": "string"},
+        "datasheet_url": {"type": "string", "format": "uri"}
+      }
+    },
+    "physical": {
+      "type": "object",
+      "required": ["length_mm", "width_mm", "pcb_thickness_mm", "_provenance"],
+      "properties": {
+        "length_mm": {"type": "number", "exclusiveMinimum": 0},
+        "width_mm": {"type": "number", "exclusiveMinimum": 0},
+        "height_mm": {"type": "number", "exclusiveMinimum": 0},
+        "pcb_thickness_mm": {"type": "number", "exclusiveMinimum": 0},
+        "weight_g": {"type": "number"},
+        "_provenance": {"$ref": "#/definitions/Provenance"}
+      }
+    },
+    "pin_layout": {
+      "type": "object",
+      "description": "Electrical SSOT for pad/through-hole positions (NEW in v2). header_groups retains the v1 housing-visual representation for frontend.",
+      "properties": {
+        "pads": {
+          "type": "array",
+          "description": "Pad-center absolute PCB coordinates. Replaces lib/pcb NamedPin once tier-A.",
+          "items": {
+            "type": "object",
+            "required": ["pad_index", "name", "pad_x_mm", "pad_y_mm", "_provenance"],
+            "properties": {
+              "pad_index": {"type": "integer", "minimum": 1},
+              "name": {"type": "string"},
+              "eagle_ref": {"type": "string"},
+              "pad_x_mm": {"type": "number"},
+              "pad_y_mm": {"type": "number"},
+              "function": {"type": "string", "enum": ["GPIO", "ANALOG", "POWER", "GND", "I2C", "SPI", "UART", "RESET", "NC"]},
+              "arduino_pin": {"type": "string"},
+              "mcu_port": {"type": "string"},
+              "_provenance": {"$ref": "#/definitions/Provenance"}
+            }
+          }
+        },
+        "header_groups": {
+          "type": "array",
+          "description": "Visual SSOT — housing positions for 3D cutout / extra_ports rendering (legacy v1 schema preserved).",
+          "items": {"type": "object"}
+        },
+        "connectors": {"type": "array"}
+      }
+    },
+    "mounting_holes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["x_mm", "y_mm", "diameter_mm", "_provenance"],
+        "properties": {
+          "x_mm": {"type": "number"},
+          "y_mm": {"type": "number"},
+          "diameter_mm": {"type": "number", "exclusiveMinimum": 0},
+          "_provenance": {"$ref": "#/definitions/Provenance"}
+        }
+      }
+    },
+    "on_board_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "_provenance"],
+        "properties": {
+          "name": {"type": "string"},
+          "package": {"type": "string"},
+          "desc": {"type": "string"},
+          "anchor_x_mm": {"type": "number"},
+          "anchor_y_mm": {"type": "number"},
+          "body_l_mm": {"type": "number", "exclusiveMinimum": 0},
+          "body_w_mm": {"type": "number", "exclusiveMinimum": 0},
+          "body_h_mm": {"type": "number", "minimum": 0},
+          "rotation": {"type": "string", "enum": ["R0", "R90", "R180", "R270"]},
+          "protrudes": {"type": "string", "enum": ["", "left", "right", "top", "bottom"]},
+          "overhang_mm": {"type": "number"},
+          "profile": {"type": "string", "enum": ["", "rect", "circle", "stadium"]},
+          "thermal": {
+            "type": "object",
+            "description": "Thermal model (Phase 4 solver input). Only present when at least datasheet+empirical confirm.",
+            "properties": {
+              "typical_mw": {"type": "number", "minimum": 0},
+              "idle_mw": {"type": "number", "minimum": 0},
+              "peak_mw": {"type": "number", "minimum": 0},
+              "formula": {"type": "string"},
+              "datasheet_ref": {"type": "string"},
+              "rth_ja_cw": {"type": "number", "minimum": 0},
+              "rth_sources": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["source", "value", "ref"],
+                  "properties": {
+                    "source": {"type": "string", "enum": ["datasheet", "jedec", "empirical"]},
+                    "value": {"type": "number"},
+                    "ref": {"type": "string"}
+                  }
+                }
+              },
+              "_provenance": {"$ref": "#/definitions/Provenance"}
+            }
+          },
+          "_provenance": {"$ref": "#/definitions/Provenance"}
+        }
+      }
+    },
+    "_3d_hints": {"type": "object", "description": "Visual SSOT (legacy v1)"},
+    "_ui_hints": {"type": "object", "description": "Visual SSOT (legacy v1)"},
+    "electrical": {"type": "object"},
+    "sources": {"type": "array"},
+    "registry_discrepancies": {"type": "array"}
+  },
+  "definitions": {
+    "Provenance": {
+      "type": "object",
+      "description": "Tier policy per ADR-002: only A/B allowed; tier-C is a BLOCKER. Zero-error rule: primary sources must have drift = 0.000, secondary sources must round-equal primary at their own precision.",
+      "required": ["tier", "sources", "consensus", "primary_source_drift_mm"],
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["A", "B"],
+          "description": "ONLY A/B allowed in verified files. C/X are BLOCKERS → problem.md (see ADR-002)."
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["kind", "ref", "role"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "eagle_brd",
+                  "kicad_mod",
+                  "kicad_pretty",
+                  "official_pdf",
+                  "official_datasheet",
+                  "jedec_standard",
+                  "empirical_measurement",
+                  "manufacturer_spec_page"
+                ]
+              },
+              "role": {
+                "type": "string",
+                "enum": ["primary", "secondary"],
+                "description": "primary = mechanical precision (BRD/KiCad/JEDEC); secondary = printed/spec (PDF/web/empirical)."
+              },
+              "ref": {
+                "type": "string",
+                "description": "Stable citation: file path + element id, or document section."
+              },
+              "value": {
+                "description": "Numerical value reported by this source. Required for drift check."
+              },
+              "precision_digits": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Decimal precision the source reports at (e.g., PDF '68.6' → 1). Used for round-check on secondary sources."
+              }
+            }
+          }
+        },
+        "consensus": {
+          "description": "The exact value written into the parent field. Per ADR-002 D-2B: take highest-precision primary source value verbatim (NO rounding, NO averaging)."
+        },
+        "primary_source_drift_mm": {
+          "type": "number",
+          "const": 0.0,
+          "description": "Drift between primary sources. MUST be exactly 0.0 (ADR-002 zero-error rule). Non-zero → BLOCKER."
+        },
+        "secondary_source_check": {
+          "type": "string",
+          "enum": ["pass", "n/a"],
+          "description": "'pass' = every secondary source's value, rounded to its precision_digits, equals the consensus. 'n/a' = no secondary sources. Anything else means BLOCKER (do not write)."
+        },
+        "tier_reason": {
+          "type": "string",
+          "description": "Required for tier B: why a 3rd independent source could not be obtained."
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"tier": {"const": "B"}}},
+          "then": {"required": ["tier_reason"]}
+        },
+        {
+          "if": {"properties": {"tier": {"const": "A"}}},
+          "then": {"properties": {"sources": {"minItems": 3}}}
+        }
+      ]
+    }
+  }
+}

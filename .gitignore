@@ -1,0 +1,146 @@
+# Demo worktree (created by scripts/demo_serve.ps1)
+.demo-worktree/
+
+# Weekly screenshots (local only, too large for git)
+docs/weekly_metrics/*/
+
+# LoRA adapter — large binary files
+saved_model/**/*.safetensors
+saved_model/**/*.pt
+saved_model/**/*.bin
+saved_model/**/checkpoint-*/
+
+# Keep small config files in saved_model
+!saved_model/**/adapter_config.json
+!saved_model/**/tokenizer*.json
+!saved_model/**/special_tokens_map.json
+!saved_model/**/chat_template.jinja
+!saved_model/**/README.md
+
+# Generated CAD / STL cache
+shells/
+*.stl
+*.step
+*.3mf
+
+# Exception: 範本 demo STL（v6/canned/*/）需隨 repo 派發，clone 即有 Demo Mode 3D 預覽
+!v6/canned/*/*.stl
+!v6/canned/*/*.step
+
+# RAG index (generated binary)
+data/rag_db/
+
+# Runtime output
+output/
+
+# Secrets
+services/server.env
+
+# Database
+*.db
+*.sqlite
+
+# Node (AutoMemory bridge dependency)
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Tool runtime state
+.claude-flow/
+.swarm/
+.mcp.json
+.claude/scheduled_tasks.lock
+
+# Auto-Skill v2 — drafts 本地保存（Q4 決策），TF-IDF cache 每機器重建
+.ai/experience/_drafts/
+.ai/experience/_index_tfidf.pkl
+# Auto-Skill v2.1 — vector retrieval bake + sentence-transformers model cache
+.ai/experience/_index_vec.pkl
+.cache_sbert/
+
+# problem.md lint hook 結果（每 session 重寫，不入 git）
+.ai/problem_lint.log
+
+# file_size_lint hook 結果（本地 audit，不入 git）
+.ai/file_size_lint.log
+
+# auto_skill_retrieve hook 端到端驗證 log（FU6）— 本地 audit，不入 git
+.ai/auto_skill_retrieve.log
+.ai/ssot_consistency.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+.claude/worktrees/
+.claude/sessions/
+
+# PowerShell / hook stderr 誤產生的垃圾檔（hook bug 已修，保留防禦規則）
+/nul.*.txt
+/ruvector.db
+
+# ruflo daemon state — local runtime, not for repo
+/agentdb.rvf
+/agentdb.rvf.lock
+
+# garbage_scan forensic log + streak counter（本地 audit，不入 git）
+.ai/garbage_log.jsonl
+.ai/garbage_streak.json
+
+# Gap 1-6 新 hook 系列 log（本地 audit，不入 git）
+.ai/py_ast_lint.log
+.ai/experience_audit_hook.log
+.ai/invalid_rate_advisory.log
+.ai/regression_pending.marker
+
+# Training data dry-run（CLI ephemeral，正式版用 cadhllm_lora_b_ch3.jsonl）
+training/data/cadhllm_lora_b_ch3_dryrun.jsonl
+
+# 暫存測試資料（user 從 Drive 下載對比用）
+tests/temp/
+
+# LoRA 訓練舊版備份（commit 0b56529 之前的版本，保留本地對比用，不入 git）
+saved_model/cadhllm_lora_b_v1_backup/
+
+# Inference smoke test 結果（每次跑 _lora_b_inference_smoke.py 重生）
+.ai/lora_b_inference_samples.json
+
+# Frozen changelog archive（git rm --cached, 本地保留）
+docs/PROJECT_CHANGELOG.md
+
+# LoRA-A tokenizer/chat_template（與 lora_b 完全相同，只追蹤 lora_b 那份）
+saved_model/cadhllm_lora/tokenizer.json
+saved_model/cadhllm_lora/chat_template.jinja
+
+# Generated docs（每次跑 rag_report.py 重建）
+docs/_generated/
+
+# Legacy codemap state (no longer used)
+.codemap-state.json
+
+# graphify code-graph: graph itself lives in ~/.graphify/stemai (local).
+# `graphify update` still writes a stray manifest.json here regardless of GRAPHIFY_OUT.
+graphify-out/
+
+# Runtime logs & debug artifacts
+server_err.log
+tools/_hook_debug.jsonl
+.ai/problem_auto_archive.log
+
+# LoRA-B deploy checkout (local only)
+cadhllm_lora_b/
+
+# Skill eval workspaces (large test fixtures, not for repo)
+.claude/skills/*-workspace/

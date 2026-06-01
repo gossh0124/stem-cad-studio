@@ -1,0 +1,15 @@
+{
+  "_doc": "no_silent_fallback_lint 設定。required_fields：這些 key 在 .get(key, <literal>) 用非 None 字面預設＝禁（缺值應 raise/derive，不可頂替）。js_magic_patterns 由工具內建。豁免：同行加註 `# nofallback-ok: <理由>`（py）或 `// nofallback-ok: <理由>`（js）。",
+  "required_fields": [
+    "inner_length", "inner_width", "inner_height",
+    "length_mm", "width_mm", "height_mm",
+    "pitch_mm", "x_mm", "y_mm", "cx", "cy"
+  ],
+  "scan_globs": [
+    "services/**/*.py",
+    "scripts/**/*.py",
+    "v6/**/*.js",
+    "v6/**/*.jsx"
+  ],
+  "exempt_marker": "nofallback-ok"
+}

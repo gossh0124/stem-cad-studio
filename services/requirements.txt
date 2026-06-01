@@ -1,0 +1,27 @@
+# Gateway / API
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+python-multipart>=0.0.9
+PyJWT>=2.8.0
+
+# CAD（本地選裝，Colab 用 cadquery）
+# cadquery>=2.4.0
+# build123d>=0.7.0
+trimesh>=4.0.0
+numpy>=1.26.0
+
+# VLM 驗證（選裝）
+anthropic>=0.28.0
+
+# RAG（元件語義搜尋 + 歷史案例檢索）
+lancedb>=0.16.0
+sentence-transformers>=4.0.0
+pyarrow>=14.0.0
+
+# LoRA / 模型（Phase I，Colab 環境）
+# unsloth==2026.2.1
+# transformers==4.57.6
+# trl==0.24.0
+# peft==0.18.1
+# bitsandbytes==0.45.5

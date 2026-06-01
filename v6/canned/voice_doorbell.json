@@ -1,0 +1,1586 @@
+{
+  "project_name": "voice_doorbell_demo",
+  "project_category": "Smart_Home",
+  "_instruction": "語音門鈴",
+  "_canned_demo": true,
+  "checkpoint_phase": 5,
+  "components_resolved": true,
+  "cot_plan": {
+    "high_level_plan": "按鈕觸發 MP3 模組播放預錄問候語，揚聲器朝外輸出。",
+    "subsystems": [
+      {
+        "role": "Brain",
+        "part": "Arduino Uno R3",
+        "type": "Arduino-Uno-class",
+        "reason": "採用 ATmega328P 微控制器，透過數位/類比 GPIO 腳位控制外部元件。",
+        "power_mw": 250,
+        "pins": 0
+      },
+      {
+        "role": "Power",
+        "part": "Generic USB 5V Power Module",
+        "type": "USB-5V-class",
+        "reason": "透過 USB 介面提供穩定 5V 直流電源，適合低功耗模組供電。",
+        "power_mw": 0,
+        "pins": 0
+      },
+      {
+        "role": "Control",
+        "part": "Tactile Push Button 12x12",
+        "type": "Button-class",
+        "reason": "機械式按鍵，按下時電路導通，是最基礎的數位輸入元件。",
+        "power_mw": 2,
+        "pins": 1
+      },
+      {
+        "role": "Output",
+        "part": "DFPlayer Mini MP3 Module",
+        "type": "MP3-Module-class",
+        "reason": "SD 卡 MP3 播放模組，可播放預錄音頻，適合語音提示應用。",
+        "power_mw": 750,
+        "pins": 2
+      }
+    ],
+    "parameter_hints": {
+      "enclosure_size": "medium",
+      "material": "PLA",
+      "wall_thickness_mm": 2.0,
+      "has_lid": true,
+      "environment": "室內",
+      "power_source": "USB 插電"
+    },
+    "power_summary": {
+      "total_mw": 1002,
+      "budget_mw": 5000
+    },
+    "total_pins": 3
+  },
+  "components": [
+    {
+      "role": "Brain",
+      "type": "Arduino-Uno-class",
+      "qty": 1,
+      "spec": {
+        "name": "Arduino Uno R3",
+        "voltage_v": 5.0,
+        "current_ma": 50.0,
+        "length_mm": 68.58,
+        "width_mm": 53.34,
+        "height_mm": 14.0,
+        "connector_ports": []
+      },
+      "educational_rationale": "採用 ATmega328P 微控制器，透過數位/類比 GPIO 腳位控制外部元件。"
+    },
+    {
+      "role": "Power",
+      "type": "USB-5V-class",
+      "qty": 1,
+      "spec": {
+        "name": "Generic USB 5V Power Module",
+        "voltage_v": 5.0,
+        "current_ma": 0.0,
+        "length_mm": 60.0,
+        "width_mm": 30.0,
+        "height_mm": 18.0,
+        "connector_ports": []
+      },
+      "educational_rationale": "透過 USB 介面提供穩定 5V 直流電源，適合低功耗模組供電。"
+    },
+    {
+      "role": "Control",
+      "type": "Button-class",
+      "qty": 1,
+      "spec": {
+        "name": "Tactile Push Button 12x12",
+        "voltage_v": 5.0,
+        "current_ma": 0.5,
+        "length_mm": 12.0,
+        "width_mm": 12.0,
+        "height_mm": 4.3,
+        "connector_ports": []
+      },
+      "educational_rationale": "機械式按鍵，按下時電路導通，是最基礎的數位輸入元件。"
+    },
+    {
+      "role": "Output",
+      "type": "MP3-Module-class",
+      "qty": 1,
+      "spec": {
+        "name": "DFPlayer Mini MP3 Module",
+        "voltage_v": 5.0,
+        "current_ma": 150.0,
+        "length_mm": 20.7,
+        "width_mm": 20.7,
+        "height_mm": 5.0,
+        "connector_ports": []
+      },
+      "educational_rationale": "SD 卡 MP3 播放模組，可播放預錄音頻，適合語音提示應用。"
+    }
+  ],
+  "enclosure_constraints": {
+    "target_size": "medium",
+    "max_dimension_mm": 220,
+    "wall_thickness_mm": 2.0,
+    "material": "PLA"
+  },
+  "enclosure_sizing": {
+    "target_size": "medium",
+    "max_dimension_mm": 220,
+    "component_count": 4,
+    "estimated_area_mm2": 8505,
+    "max_component_dim_mm": 68.6,
+    "rationale": "共 4 個元件，估算佈局面積 8505 mm²，建議 一般尺寸（≤ 220mm）",
+    "wall_thickness_mm": 2.0,
+    "material": "PLA"
+  },
+  "inventory_mentions": [],
+  "bom": [
+    {
+      "role": "Brain",
+      "type": "Arduino-Uno-class",
+      "label": "Arduino Uno R3",
+      "qty": 1,
+      "unit_ma": 50.0,
+      "total_ma": 50.0,
+      "unit_ntd": 250,
+      "total_ntd": 250
+    },
+    {
+      "role": "Power",
+      "type": "USB-5V-class",
+      "label": "Generic USB 5V Power Module",
+      "qty": 1,
+      "unit_ma": 0.0,
+      "total_ma": 0.0,
+      "unit_ntd": 80,
+      "total_ntd": 80
+    },
+    {
+      "role": "Control",
+      "type": "Button-class",
+      "label": "Tactile Push Button 12x12",
+      "qty": 1,
+      "unit_ma": 0.5,
+      "total_ma": 0.5,
+      "unit_ntd": 10,
+      "total_ntd": 10
+    },
+    {
+      "role": "Output",
+      "type": "MP3-Module-class",
+      "label": "DFPlayer Mini MP3 Module",
+      "qty": 1,
+      "unit_ma": 150.0,
+      "total_ma": 150.0,
+      "unit_ntd": 90,
+      "total_ntd": 90
+    }
+  ],
+  "power_budget": {
+    "total_ma": 200.5,
+    "budget_ma": 1000,
+    "ok": true,
+    "supply_v": 5.0,
+    "power_source": "USB-5V-class",
+    "needs_ldo": false,
+    "total_mw": 1002.5,
+    "needs_ventilation": false
+  },
+  "phase3_constraint_check": {
+    "overall_ok": true,
+    "timestamp": "2026-05-31 15:29",
+    "results": {
+      "power": {
+        "ok": true,
+        "details": [
+          {
+            "level": "OK",
+            "rule": "PowerBudget",
+            "msg": "200/1000 mA (USB-5V-class)"
+          }
+        ]
+      },
+      "io": {
+        "ok": true,
+        "details": []
+      },
+      "pin_current": {
+        "ok": true,
+        "details": []
+      },
+      "wiring": {
+        "ok": true,
+        "details": []
+      },
+      "geometry": {
+        "ok": true,
+        "details": {
+          "spatial_ok": true
+        }
+      },
+      "interference": {
+        "ok": true,
+        "details": {
+          "ok": true
+        }
+      }
+    }
+  },
+  "wiring_notes": [],
+  "schematic_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"480\" viewBox=\"0 0 800 480\" style=\"background:#0a0a0f;font-family:'IBM Plex Mono','Courier New',monospace;\"><style>@keyframes sigflow { 0%{stroke-dashoffset:40;opacity:.9} 100%{stroke-dashoffset:0;opacity:.2} }\n.sig-anim { stroke-dasharray:6 4; animation:sigflow .7s linear infinite; }</style><defs><marker id=\"arrowG\" markerWidth=\"6\" markerHeight=\"5\" refX=\"5\" refY=\"2.5\" orient=\"auto\"><polygon points=\"0 0, 6 2.5, 0 5\" fill=\"#00cc66\" opacity=\"0.8\" /></marker><marker id=\"arrowP\" markerWidth=\"6\" markerHeight=\"5\" refX=\"5\" refY=\"2.5\" orient=\"auto\"><polygon points=\"0 0, 6 2.5, 0 5\" fill=\"#cc4488\" opacity=\"0.8\" /></marker></defs><line x1=\"0\" y1=\"0\" x2=\"800\" y2=\"0\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"30\" x2=\"800\" y2=\"30\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"60\" x2=\"800\" y2=\"60\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"90\" x2=\"800\" y2=\"90\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"120\" x2=\"800\" y2=\"120\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"150\" x2=\"800\" y2=\"150\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"180\" x2=\"800\" y2=\"180\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"210\" x2=\"800\" y2=\"210\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"240\" x2=\"800\" y2=\"240\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"270\" x2=\"800\" y2=\"270\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"300\" x2=\"800\" y2=\"300\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"330\" x2=\"800\" y2=\"330\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"360\" x2=\"800\" y2=\"360\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"390\" x2=\"800\" y2=\"390\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"420\" x2=\"800\" y2=\"420\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"450\" x2=\"800\" y2=\"450\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"480\" x2=\"800\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"0\" y1=\"0\" x2=\"0\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"30\" y1=\"0\" x2=\"30\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"60\" y1=\"0\" x2=\"60\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"90\" y1=\"0\" x2=\"90\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"120\" y1=\"0\" x2=\"120\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"150\" y1=\"0\" x2=\"150\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"180\" y1=\"0\" x2=\"180\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"210\" y1=\"0\" x2=\"210\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"240\" y1=\"0\" x2=\"240\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"270\" y1=\"0\" x2=\"270\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"300\" y1=\"0\" x2=\"300\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"330\" y1=\"0\" x2=\"330\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"360\" y1=\"0\" x2=\"360\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"390\" y1=\"0\" x2=\"390\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"420\" y1=\"0\" x2=\"420\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"450\" y1=\"0\" x2=\"450\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"480\" y1=\"0\" x2=\"480\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"510\" y1=\"0\" x2=\"510\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"540\" y1=\"0\" x2=\"540\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"570\" y1=\"0\" x2=\"570\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"600\" y1=\"0\" x2=\"600\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"630\" y1=\"0\" x2=\"630\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"660\" y1=\"0\" x2=\"660\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"690\" y1=\"0\" x2=\"690\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"720\" y1=\"0\" x2=\"720\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"750\" y1=\"0\" x2=\"750\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><line x1=\"780\" y1=\"0\" x2=\"780\" y2=\"480\" stroke=\"#1a1a28\" stroke-width=\"1\" /><rect x=\"350\" y=\"180\" width=\"100\" height=\"120\" rx=\"4\" fill=\"#141420\" stroke=\"#00aaff\" stroke-width=\"1.5\"><title>Arduino MCU</title></rect><text x=\"400\" y=\"234\" text-anchor=\"middle\" fill=\"#00aaff\" font-size=\"11\" font-weight=\"700\">Arduino</text><text x=\"400\" y=\"248\" text-anchor=\"middle\" fill=\"#00aaff\" font-size=\"11\" font-weight=\"700\">Uno</text><rect x=\"360\" y=\"14\" width=\"80\" height=\"24\" rx=\"4\" fill=\"none\" stroke=\"#f0c060\" stroke-width=\"1.5\" stroke-dasharray=\"4,2\"><title>Power: USB 5V</title></rect><text x=\"400\" y=\"30\" text-anchor=\"middle\" fill=\"#f0c060\" font-size=\"10\">USB 5V</text><line x1=\"400\" y1=\"38\" x2=\"400\" y2=\"180\" stroke=\"#f0c060\" stroke-width=\"1.5\" stroke-dasharray=\"3,2\" /><g data-xv-id=\"comp:Button\" style=\"cursor:pointer;\"><rect x=\"85\" y=\"175\" width=\"90\" height=\"50\" rx=\"4\" fill=\"#141420\" stroke=\"#00ff88\" stroke-width=\"1.5\"><title>微動按鈕（含上拉） [SIG=D2]</title></rect><text x=\"130\" y=\"194\" text-anchor=\"middle\" fill=\"#00ff88\" font-size=\"9\">Button</text><path d=\"M175,200 C262,200 262,200 350,200\" fill=\"none\" stroke=\"#44cc44\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"-20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"179\" y=\"197\" fill=\"#44cc44\" font-size=\"7\">SIG→D2</text></g><g data-xv-id=\"comp:Speaker\" style=\"cursor:pointer;\"><rect x=\"85\" y=\"255\" width=\"90\" height=\"50\" rx=\"4\" fill=\"#141420\" stroke=\"#00ff88\" stroke-width=\"1.5\"><title>DFPlayer Mini 音樂模組 [TX=D4, RX=D7]</title></rect><text x=\"130\" y=\"274\" text-anchor=\"middle\" fill=\"#00ff88\" font-size=\"9\">DFPlayer</text><text x=\"130\" y=\"287\" text-anchor=\"middle\" fill=\"#00ff88\" font-size=\"9\">Mini</text><path d=\"M175,276 C262,276 262,276 350,276\" fill=\"none\" stroke=\"#4488ff\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"-20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"179\" y=\"273\" fill=\"#4488ff\" font-size=\"7\">TX→D4</text><path d=\"M175,284 C270,284 270,284 350,284\" fill=\"none\" stroke=\"#ffaa00\" stroke-width=\"1.5\" stroke-dasharray=\"6,4\"><animate attributeName=\"stroke-dashoffset\" from=\"0\" to=\"-20\" dur=\"1.2s\" repeatCount=\"indefinite\" /></path><text x=\"179\" y=\"281\" fill=\"#ffaa00\" font-size=\"7\">RX→D7</text><circle cx=\"79\" cy=\"272\" r=\"3\" fill=\"#ff4444\" /><circle cx=\"79\" cy=\"288\" r=\"3\" fill=\"#333\" /></g><line x1=\"60\" y1=\"460\" x2=\"740\" y2=\"460\" stroke=\"#555\" stroke-width=\"1\" stroke-dasharray=\"3,3\" /><text x=\"400\" y=\"474\" text-anchor=\"middle\" fill=\"#555\" font-size=\"9\">─── GND Rail ───</text><rect x=\"20\" y=\"20\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#00aaff\" /><text x=\"34\" y=\"29\" fill=\"#aaa\" font-size=\"9\">MCU 主控</text><rect x=\"20\" y=\"36\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#00ff88\" /><text x=\"34\" y=\"45\" fill=\"#aaa\" font-size=\"9\">輸出元件</text><rect x=\"20\" y=\"52\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#ff88cc\" /><text x=\"34\" y=\"61\" fill=\"#aaa\" font-size=\"9\">感測器</text><rect x=\"20\" y=\"68\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#f0c060\" /><text x=\"34\" y=\"77\" fill=\"#aaa\" font-size=\"9\">電源</text></svg>",
+  "scope_note": "",
+  "role_alternatives": {
+    "Brain": [
+      {
+        "type": "ESP32-class",
+        "name": "ESP32 DevKit V1",
+        "power_mw": 792,
+        "current_ma": 240,
+        "reason": "雙核心 CPU 內建 Wi-Fi/Bluetooth，適合 IoT 無線控制應用。"
+      },
+      {
+        "type": "RaspberryPi-class",
+        "name": "Raspberry Pi 4 Model B",
+        "power_mw": 3000,
+        "current_ma": 600,
+        "reason": "Linux 單板電腦，適合需要作業系統支援的複雜 AI 應用。"
+      },
+      {
+        "type": "Microbit-class",
+        "name": "BBC micro:bit v2",
+        "power_mw": 99,
+        "current_ma": 30,
+        "reason": "內建加速度計與 LED 矩陣，專為 STEM 教育設計的微控制板。"
+      }
+    ],
+    "Power": [
+      {
+        "type": "Battery-LiPo-class",
+        "name": "1S 1000mAh LiPo Battery",
+        "power_mw": 0,
+        "current_ma": 0,
+        "reason": "鋰聚合物電池，能量密度高，適合需要可攜式電源的專題。"
+      },
+      {
+        "type": "Battery-AA-class",
+        "name": "2xAA Battery Holder",
+        "power_mw": 0,
+        "current_ma": 0,
+        "reason": "標準 AA 乾電池，取得方便，適合低功耗感測器節點。"
+      },
+      {
+        "type": "AC-Adapter-class",
+        "name": "AC-DC 5V 2A Adapter Module",
+        "power_mw": 10000,
+        "current_ma": 2000,
+        "reason": "將交流電轉換為穩定直流輸出，適合固定式高功耗設備供電。"
+      },
+      {
+        "type": "USB-Adapter-class",
+        "name": "USB 5V Power Adapter",
+        "power_mw": 5000,
+        "current_ma": 1000,
+        "reason": ""
+      }
+    ],
+    "Control": [
+      {
+        "type": "Switch-class",
+        "name": "Toggle Switch SPDT",
+        "power_mw": 0,
+        "current_ma": 0,
+        "reason": "撥動式開關，可維持開/關狀態，適合電源控制或模式切換。"
+      },
+      {
+        "type": "Switch-Generic-class",
+        "name": "Generic Toggle Switch",
+        "power_mw": 0,
+        "current_ma": 0,
+        "reason": ""
+      },
+      {
+        "type": "Potentiometer-class",
+        "name": "Rotary Potentiometer 10K",
+        "power_mw": 5,
+        "current_ma": 1,
+        "reason": "可變電阻器，輸出 0~5V 類比電壓，用於調節音量或速度。"
+      },
+      {
+        "type": "Remote-class",
+        "name": "IR Remote Control Module",
+        "power_mw": 16,
+        "current_ma": 5,
+        "reason": "紅外線遙控器，發送 IR 編碼訊號，配合接收模組實現無線控制。"
+      },
+      {
+        "type": "Joystick-class",
+        "name": "Dual-Axis Joystick Module",
+        "power_mw": 10,
+        "current_ma": 2,
+        "reason": "雙軸類比搖桿，輸出 XY 方向電壓值，適合遙控移動方向。"
+      }
+    ],
+    "Output": [
+      {
+        "type": "Motor-Servo-class",
+        "name": "SG90 Micro Servo Motor",
+        "power_mw": 750,
+        "current_ma": 150,
+        "reason": "伺服馬達，可精確控制轉角 0 至 180 度，適合機械臂關節。"
+      },
+      {
+        "type": "Motor-DC-class",
+        "name": "DC Gear Motor 3-6V",
+        "power_mw": 1500,
+        "current_ma": 300,
+        "reason": "直流馬達，透過 PWM 調速，適合輪式機器人驅動。"
+      },
+      {
+        "type": "Pump-Water-class",
+        "name": "Mini Submersible Water Pump 3-5V",
+        "power_mw": 1100,
+        "current_ma": 220,
+        "reason": "小型水泵，透過繼電器控制開關，用於自動澆水或水循環。"
+      },
+      {
+        "type": "Relay-Module-class",
+        "name": "5V Single Channel Relay Module",
+        "power_mw": 400,
+        "current_ma": 80,
+        "reason": "電磁繼電器，以低電壓控制高電壓迴路的通斷開關。"
+      },
+      {
+        "type": "L298N-Driver-class",
+        "name": "L298N Dual H-Bridge Motor Driver Module",
+        "power_mw": 3000,
+        "current_ma": 600,
+        "reason": ""
+      }
+    ]
+  },
+  "wiring": {
+    "Button": {
+      "label": "微動按鈕（含上拉）",
+      "pins": [
+        {
+          "comp": "GND",
+          "mcu": "GND",
+          "color": "#333333",
+          "note": "",
+          "comp_dir": "gnd",
+          "comp_vd": "n/a",
+          "mcu_dir": "gnd",
+          "mcu_vd": "n/a"
+        },
+        {
+          "comp": "SIG",
+          "mcu": "D2",
+          "color": "#44cc44",
+          "note": "INPUT_PULLUP（按下=LOW）",
+          "passive": null,
+          "comp_dir": "other",
+          "comp_vd": "n/a",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        }
+      ]
+    },
+    "Speaker": {
+      "label": "DFPlayer Mini 音樂模組",
+      "pins": [
+        {
+          "comp": "VCC",
+          "mcu": "5V",
+          "color": "#ff4444",
+          "note": "",
+          "comp_dir": "power",
+          "comp_vd": "5V",
+          "mcu_dir": "power",
+          "mcu_vd": "5V"
+        },
+        {
+          "comp": "GND",
+          "mcu": "GND",
+          "color": "#333333",
+          "note": "",
+          "comp_dir": "gnd",
+          "comp_vd": "n/a",
+          "mcu_dir": "gnd",
+          "mcu_vd": "n/a"
+        },
+        {
+          "comp": "TX",
+          "mcu": "D4",
+          "color": "#4488ff",
+          "note": "SoftwareSerial TX（1kΩ 串聯）",
+          "passive": {
+            "kind": "R",
+            "value": "1kΩ",
+            "topo": "series",
+            "location": "external",
+            "purchasable": true,
+            "refdes": "R1",
+            "nets": [
+              "MCU.D4",
+              "Speaker.TX"
+            ]
+          },
+          "comp_dir": "uart_tx",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        },
+        {
+          "comp": "RX",
+          "mcu": "D7",
+          "color": "#ffaa00",
+          "note": "SoftwareSerial RX",
+          "passive": null,
+          "comp_dir": "uart_rx",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        },
+        {
+          "comp": "SPK+",
+          "mcu": "SPK",
+          "color": "#ff88cc",
+          "note": "接 8Ω 喇叭正極",
+          "passive": null,
+          "comp_dir": "analog_out",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        },
+        {
+          "comp": "SPK-",
+          "mcu": "SPK-",
+          "color": "#888888",
+          "note": "接 8Ω 喇叭負極",
+          "passive": null,
+          "comp_dir": "analog_out",
+          "comp_vd": "logic_5V",
+          "mcu_dir": "digital_bidir",
+          "mcu_vd": "logic_5V"
+        }
+      ],
+      "decoupling": [
+        {
+          "kind": "C",
+          "value": "100nF",
+          "topo": "decoupling",
+          "location": "onboard",
+          "purchasable": false,
+          "refdes": "C1",
+          "nets": [
+            "Speaker.VCC",
+            "GND"
+          ]
+        }
+      ]
+    }
+  },
+  "pin_allocation": {
+    "Button": {
+      "SIG": 2
+    },
+    "Speaker": {
+      "TX": 4,
+      "RX": 7
+    }
+  },
+  "pin_labels": {
+    "Button": "SIG=D2",
+    "Speaker": "TX=D4 / RX=D7"
+  },
+  "cad_output": {
+    "component_placements": [
+      {
+        "type": "Arduino-Uno-class",
+        "role": "Brain",
+        "x": 3.0,
+        "y": 3.0,
+        "L": 68.58,
+        "W": 53.34,
+        "H": 14.0,
+        "zone": "center",
+        "face_out": "side-front",
+        "enclosure_relation": "internal"
+      },
+      {
+        "type": "MP3-Module-class",
+        "role": "Output",
+        "x": 74.6,
+        "y": 3.0,
+        "L": 20.7,
+        "W": 20.7,
+        "H": 5.0,
+        "zone": "bottom-edge",
+        "face_out": "side-front",
+        "enclosure_relation": "internal"
+      }
+    ],
+    "panel_placements": [
+      {
+        "type": "Button-class",
+        "role": "Control",
+        "face": "top",
+        "u": 3.0,
+        "v": 3.0,
+        "L": 12.0,
+        "W": 12.0,
+        "H": 4.3,
+        "thermal_mw": 0.0,
+        "enclosure_relation": "panel"
+      }
+    ],
+    "external_refs": [
+      {
+        "type": "USB-5V-class",
+        "role": "Power",
+        "wire_exit_face": "side-back",
+        "wire_exit_u": 53.0,
+        "wire_exit_v": 0.0,
+        "wire_exit_diameter": 6.0,
+        "enclosure_relation": "external"
+      }
+    ],
+    "embedded_refs": [],
+    "thermal_field": {
+      "heat_sources": [
+        {
+          "type": "Arduino-Uno-class",
+          "power_mw": 250.0,
+          "estimated": false,
+          "spatial_kind": "point",
+          "estimation_source": "datasheet",
+          "user_confirmed": false
+        },
+        {
+          "type": "MP3-Module-class",
+          "power_mw": 1000.0,
+          "estimated": false,
+          "spatial_kind": "point",
+          "estimation_source": "datasheet",
+          "user_confirmed": false
+        }
+      ],
+      "total_power_mw": 1250.0,
+      "thermal_tier": "MID",
+      "needs_venting": false,
+      "passive_venting": true,
+      "vent_placements": [
+        {
+          "face": "side_lower",
+          "area_mm2": 4464.0,
+          "type": "vent_opening"
+        }
+      ],
+      "thermal_overlay": {
+        "heat_sources": [
+          {
+            "type": "Arduino-Uno-class",
+            "position": [
+              3.0,
+              3.0,
+              0.0
+            ],
+            "surface_temp_c": 28.3,
+            "influence_radius_mm": 22.4,
+            "thermal_mw": 250.0
+          },
+          {
+            "type": "MP3-Module-class",
+            "position": [
+              74.58,
+              3.0,
+              0.0
+            ],
+            "surface_temp_c": 137.4,
+            "influence_radius_mm": 40.0,
+            "thermal_mw": 1000.0
+          }
+        ],
+        "ambient_c": 25.0,
+        "estimated_dt_c": 7.4,
+        "color_lut": [
+          {
+            "temp_c": 25,
+            "color": "#0000ff"
+          },
+          {
+            "temp_c": 35,
+            "color": "#00ff00"
+          },
+          {
+            "temp_c": 50,
+            "color": "#ff0000"
+          }
+        ]
+      },
+      "airflow_overlay": {
+        "mode": "passive",
+        "vent_count": 1,
+        "vent_positions": [
+          [
+            "side_lower"
+          ]
+        ]
+      }
+    },
+    "wire_routes": [
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Button-class",
+        "waypoints": [
+          [
+            20.1,
+            4.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            14.0
+          ],
+          [
+            20.1,
+            0.0,
+            22.0
+          ],
+          [
+            21.0,
+            5.0,
+            22.0
+          ],
+          [
+            5.0,
+            5.0,
+            22.0
+          ],
+          [
+            5.0,
+            7.0,
+            22.0
+          ],
+          [
+            0.0,
+            9.0,
+            22.0
+          ],
+          [
+            0.0,
+            9.0,
+            4.3
+          ],
+          [
+            5.4,
+            9.0,
+            4.3
+          ]
+        ],
+        "signal_type": "gnd",
+        "layer_z": 22.0,
+        "routed_length_mm": 63.6,
+        "color": "#333333",
+        "mcu_pin": "GND",
+        "comp_pin": "GND"
+      },
+      {
+        "from": "Arduino-Uno-class",
+        "to": "Button-class",
+        "waypoints": [
+          [
+            29.9,
+            55.3,
+            14.0
+          ],
+          [
+            29.9,
+            59.3,
+            14.0
+          ],
+          [
+            29.9,
+            59.3,
+            24.0
+          ],
+          [
+            29.0,
+            55.0,
+            24.0
+          ],
+          [
+            13.0,
+            55.0,
+            24.0
+          ],
+          [
+            13.0,
+            11.0,
+            24.0
+          ],
+          [
+            18.0,
+            9.0,
+            24.0
+          ],
+          [
+            18.0,
+            9.0,
+            4.3
+          ],
+          [
+            12.6,
+            9.0,
+            4.3
+          ]
+        ],
+        "signal_type": "digital",
+        "layer_z": 24.0,
+        "routed_length_mm": 108.9,
+        "color": "#44cc44",
+        "mcu_pin": "D2",
+        "comp_pin": "SIG"
+      }
+    ],
+    "decisions": [
+      {
+        "step": "enclosure_partition",
+        "principle": "殼體關係分流",
+        "description": "依 enclosure_relation 分流 4 元件：pack(internal+breadboard)=2, panel=1, external=1, embedded=0。Pack 元件參與殼內 packing，panel 元件分配殼面，external/embedded 僅作走線 endpoint。",
+        "formula": "bucket = ComponentSpec.enclosure_relation",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "gravity_sort",
+        "principle": "重心穩定",
+        "description": "依重量排序 3 個元件（總重 30g）。最重：Arduino-Uno (25g)，優先放置於底部。",
+        "formula": "placement_priority = sorted(components, key=weight_g, desc)",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "thermal_classify",
+        "principle": "熱源隔離",
+        "description": "功耗 > 500mW 的熱源：MP3-Module(1000mW)。需與 0 個感測器保持距離，避免溫度影響量測精度。",
+        "formula": "hot_threshold = 500 mW",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "zone_assign",
+        "principle": "功能分區",
+        "description": "依角色分區：Arduino-Uno→center; MP3-Module→bottom-edge; Button→center。Brain 居中便於走線輻射，感測器靠外壁便於開窗，熱源置底利用自然對流散熱。",
+        "formula": "zone = f(role, is_hot)",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "shelf_pack",
+        "principle": "空間最佳化",
+        "description": "First-Fit Decreasing shelf packing：2 元件排入 106x80mm 空間，面積利用率 48%。元件間距 3mm 確保組裝空間與走線通道。",
+        "formula": "utilization = 4087 / 8435 = 48%",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "collision_check",
+        "principle": "干涉防護（PV2）",
+        "description": "無碰撞：2 個元件 3D AABB 無重疊 ✓",
+        "formula": "",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "cog_check",
+        "principle": "重心穩定（PV4）",
+        "description": "重心 (40.5, 26.8) 位於底座中央 2/3 區域內 （中心 53.0, 39.8）✓",
+        "formula": "CoG ∈ [L/6, 5L/6] × [W/6, 5W/6]",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "panel_layout",
+        "principle": "面板元件分配",
+        "description": "1 個 panel 元件分配至殼面：Button→top@u=3。 各面有效寬度足夠容納。",
+        "formula": "face = majority_vote(port.side); u = sum(L+clearance) per face",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "port_orient",
+        "principle": "介面可達性",
+        "description": "Port 朝向最近外壁：Arduino-Uno USB→side-front; MP3-Module USB→side-front。USB/電源口朝外便於插拔，感測器朝上或朝外便於偵測。",
+        "formula": "face_out = argmin(distance_to_wall)",
+        "6e_stage": "engineer"
+      },
+      {
+        "step": "wire_route",
+        "principle": "多層 3D 走線（pin-to-pin + riser + layer separation）",
+        "description": "3D A* 完成 2 條走線（2 條 pin-to-pin），分佈於 2 層 Z 平面，總長度 172mm。各訊號類型佔獨立 Z 層避免交叉；同層走線互為障礙物避免重疊。",
+        "formula": "path = A*(pin_pos, obstacles ∪ same_layer_wires); z = f(signal_type)",
+        "6e_stage": "explain"
+      },
+      {
+        "step": "thermal_validate",
+        "principle": "散熱設計",
+        "description": "總熱功率 1250mW，Tier=MID。密閉殼估算溫升 dT~7.4°C。500–1500mW，建議增加被動通風開口。 通風位置 1 處（總面積 4464mm²，基於自然對流 h=7.0 W/m²K、容許溫升 40.0°C）。",
+        "formula": "A_vent = P / (h·ΔT_max) = 1.25W / (7.0×40.0) = 4464 mm²",
+        "6e_stage": "explain"
+      }
+    ],
+    "spec": {
+      "inner_length": 106.1,
+      "inner_width": 87.0,
+      "inner_height": 23.3,
+      "wall": 2.0,
+      "tol": 0.3
+    },
+    "engine": "build123d",
+    "scene_graph_v3": {
+      "version": "3.0",
+      "coordinate_system": "y-up",
+      "enclosure": {
+        "inner": [
+          106.1,
+          87.0,
+          23.3
+        ],
+        "wall": 2.0,
+        "holes": [],
+        "face_cutouts": [
+          {
+            "face": "top",
+            "center": [
+              -44.0,
+              23.3,
+              -34.5
+            ],
+            "comp_type": "Button-class",
+            "shape": "rect",
+            "width": 12.0,
+            "height": 12.0,
+            "mount": "cutout"
+          }
+        ],
+        "meshes": []
+      },
+      "modules": [
+        {
+          "id": "arduino-uno-0",
+          "comp_type": "Arduino-Uno-class",
+          "role": "Brain",
+          "position": [
+            -13.8,
+            0.0,
+            -11.8
+          ],
+          "dimensions": [
+            72.58,
+            57.34,
+            16.0
+          ],
+          "enclosure_relation": "internal",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Arduino-Uno-class/stl?variant=pcb_body",
+              "format": "glb"
+            },
+            {
+              "variant": "base",
+              "url": "/api/shells/Arduino-Uno-class/stl?variant=base",
+              "format": "glb"
+            },
+            {
+              "variant": "lid",
+              "url": "/api/shells/Arduino-Uno-class/stl?variant=lid",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "USB-B",
+              "world": [
+                -52.0,
+                2.0,
+                -2.4
+              ],
+              "port_type": "USB",
+              "side": "left",
+              "width": 12.0,
+              "height": 11.0,
+              "pins": [
+                "USB-B"
+              ]
+            },
+            {
+              "name": "DC-Jack",
+              "world": [
+                -52.0,
+                1.0,
+                -32.1
+              ],
+              "port_type": "PWR",
+              "side": "left",
+              "width": 9.0,
+              "height": 11.0,
+              "pins": [
+                "DC-Jack"
+              ]
+            },
+            {
+              "name": "Power-Header",
+              "world": [
+                -13.2,
+                0.0,
+                -38.0
+              ],
+              "port_type": "PWR",
+              "side": "face",
+              "width": 22.319999999999997,
+              "height": 4.54,
+              "pins": [
+                "NC",
+                "IOREF",
+                "RESET",
+                "+3V3",
+                "+5V",
+                "GND",
+                "GND",
+                "VIN"
+              ]
+            },
+            {
+              "name": "Analog-A0~A5",
+              "world": [
+                7.1,
+                0.0,
+                -38.0
+              ],
+              "port_type": "ANALOG",
+              "side": "face",
+              "width": 17.240000000000002,
+              "height": 4.54,
+              "pins": [
+                "A0",
+                "A1",
+                "A2",
+                "A3",
+                "A4/SDA",
+                "A5/SCL"
+              ]
+            },
+            {
+              "name": "Digital-D0~D7",
+              "world": [
+                4.6,
+                0.0,
+                10.3
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 22.32,
+              "height": 4.54,
+              "pins": [
+                "D0",
+                "D1",
+                "D2",
+                "D3",
+                "D4",
+                "D5",
+                "D6",
+                "D7"
+              ]
+            },
+            {
+              "name": "Digital-D8~SCL",
+              "world": [
+                -19.8,
+                0.0,
+                10.3
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 27.4,
+              "height": 4.54,
+              "pins": [
+                "D8",
+                "D9",
+                "SS",
+                "MOSI",
+                "MISO",
+                "SCK",
+                "GND",
+                "AREF",
+                "A4/SDA(dup)",
+                "A5/SCL(dup)"
+              ]
+            },
+            {
+              "name": "ICSP",
+              "world": [
+                14.9,
+                0.0,
+                -12.6
+              ],
+              "port_type": "SPI",
+              "side": "face",
+              "width": 7.079999999999999,
+              "height": 9.620000000000001,
+              "pins": [
+                "MISO",
+                "+5V",
+                "SCK",
+                "MOSI",
+                "RESET",
+                "GND"
+              ]
+            }
+          ],
+          "thermal_mw": 250.0
+        },
+        {
+          "id": "usb-5v-1",
+          "comp_type": "USB-5V-class",
+          "role": "Power",
+          "position": [
+            91.0,
+            0.0,
+            -25.5
+          ],
+          "dimensions": [
+            60.0,
+            30.0,
+            18.0
+          ],
+          "enclosure_relation": "external",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/USB-5V-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "USB-IN",
+              "world": [
+                91.0,
+                0.0,
+                -40.5
+              ],
+              "port_type": "USB",
+              "side": "bottom",
+              "width": 14.0,
+              "height": 6.5,
+              "pins": [
+                "USB-IN"
+              ]
+            },
+            {
+              "name": "VCC-OUT",
+              "world": [
+                118.0,
+                0.0,
+                -10.5
+              ],
+              "port_type": "PWR",
+              "side": "face",
+              "width": 5.0,
+              "height": 4.0,
+              "pins": [
+                "VCC-OUT"
+              ]
+            },
+            {
+              "name": "GND-OUT",
+              "world": [
+                104.0,
+                0.0,
+                -10.5
+              ],
+              "port_type": "GND",
+              "side": "face",
+              "width": 5.0,
+              "height": 4.0,
+              "pins": [
+                "GND-OUT"
+              ]
+            }
+          ],
+          "thermal_mw": 0.0
+        },
+        {
+          "id": "button-2",
+          "comp_type": "Button-class",
+          "role": "Control",
+          "position": [
+            -44.0,
+            21.2,
+            -34.5
+          ],
+          "dimensions": [
+            12.0,
+            12.0,
+            4.3
+          ],
+          "enclosure_relation": "panel",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/Button-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "Pin-A1",
+              "world": [
+                -47.3,
+                19.0,
+                -37.8
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 1.0,
+              "height": 1.0,
+              "pins": [
+                "Pin-A1"
+              ]
+            },
+            {
+              "name": "Pin-A2",
+              "world": [
+                -47.3,
+                19.0,
+                -31.2
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 1.0,
+              "height": 1.0,
+              "pins": [
+                "Pin-A2"
+              ]
+            },
+            {
+              "name": "Pin-B1",
+              "world": [
+                -40.8,
+                19.0,
+                -37.8
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 1.0,
+              "height": 1.0,
+              "pins": [
+                "Pin-B1"
+              ]
+            },
+            {
+              "name": "Pin-B2",
+              "world": [
+                -40.8,
+                19.0,
+                -31.2
+              ],
+              "port_type": "GPIO",
+              "side": "face",
+              "width": 1.0,
+              "height": 1.0,
+              "pins": [
+                "Pin-B2"
+              ]
+            }
+          ],
+          "thermal_mw": 0.0
+        },
+        {
+          "id": "mp3-module-3",
+          "comp_type": "MP3-Module-class",
+          "role": "Output",
+          "position": [
+            -39.7,
+            0.0,
+            30.2
+          ],
+          "dimensions": [
+            20.7,
+            20.7,
+            5.0
+          ],
+          "enclosure_relation": "internal",
+          "meshes": [
+            {
+              "variant": "pcb_body",
+              "url": "/api/shells/MP3-Module-class/stl?variant=pcb_body",
+              "format": "glb"
+            }
+          ],
+          "shell_ports": [
+            {
+              "name": "VCC",
+              "world": [
+                -50.0,
+                1.0,
+                38.7
+              ],
+              "port_type": "PWR",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "VCC"
+              ]
+            },
+            {
+              "name": "RX",
+              "world": [
+                -50.0,
+                1.0,
+                36.2
+              ],
+              "port_type": "UART",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "RX"
+              ]
+            },
+            {
+              "name": "TX",
+              "world": [
+                -50.0,
+                1.0,
+                33.7
+              ],
+              "port_type": "UART",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "TX"
+              ]
+            },
+            {
+              "name": "DAC_R",
+              "world": [
+                -50.0,
+                1.0,
+                31.1
+              ],
+              "port_type": "AUDIO",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "DAC_R"
+              ]
+            },
+            {
+              "name": "DAC_L",
+              "world": [
+                -50.0,
+                1.0,
+                28.6
+              ],
+              "port_type": "AUDIO",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "DAC_L"
+              ]
+            },
+            {
+              "name": "SPK1",
+              "world": [
+                -50.0,
+                1.0,
+                26.0
+              ],
+              "port_type": "AUDIO",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "SPK1"
+              ]
+            },
+            {
+              "name": "GND",
+              "world": [
+                -50.0,
+                1.0,
+                23.5
+              ],
+              "port_type": "GND",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "GND"
+              ]
+            },
+            {
+              "name": "SPK2",
+              "world": [
+                -50.0,
+                1.0,
+                21.0
+              ],
+              "port_type": "AUDIO",
+              "side": "left",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "SPK2"
+              ]
+            },
+            {
+              "name": "BUSY",
+              "world": [
+                -29.3,
+                1.0,
+                38.7
+              ],
+              "port_type": "GPIO",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "BUSY"
+              ]
+            },
+            {
+              "name": "USB-",
+              "world": [
+                -29.3,
+                1.0,
+                36.2
+              ],
+              "port_type": "USB",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "USB-"
+              ]
+            },
+            {
+              "name": "USB+",
+              "world": [
+                -29.3,
+                1.0,
+                33.7
+              ],
+              "port_type": "USB",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "USB+"
+              ]
+            },
+            {
+              "name": "ADKEY2",
+              "world": [
+                -29.3,
+                1.0,
+                31.1
+              ],
+              "port_type": "ANALOG",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "ADKEY2"
+              ]
+            },
+            {
+              "name": "ADKEY1",
+              "world": [
+                -29.3,
+                1.0,
+                28.6
+              ],
+              "port_type": "ANALOG",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "ADKEY1"
+              ]
+            },
+            {
+              "name": "IO2",
+              "world": [
+                -29.3,
+                1.0,
+                26.0
+              ],
+              "port_type": "GPIO",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "IO2"
+              ]
+            },
+            {
+              "name": "GND2",
+              "world": [
+                -29.3,
+                1.0,
+                23.5
+              ],
+              "port_type": "GND",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "GND2"
+              ]
+            },
+            {
+              "name": "IO1",
+              "world": [
+                -29.3,
+                1.0,
+                21.0
+              ],
+              "port_type": "GPIO",
+              "side": "right",
+              "width": 2.54,
+              "height": 2.54,
+              "pins": [
+                "IO1"
+              ]
+            }
+          ],
+          "thermal_mw": 1000.0
+        }
+      ],
+      "wires": [
+        {
+          "id": "w0",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Power-Header",
+            "pin": "GND"
+          },
+          "to": {
+            "module": "button-2",
+            "port": "Pin-A1",
+            "pin": "GND"
+          },
+          "signal": "gnd",
+          "color": "#333333",
+          "path3d": [
+            [
+              -13.2,
+              0.0,
+              -38.0
+            ],
+            [
+              -13.2,
+              19.0,
+              -38.0
+            ],
+            [
+              -12.5,
+              19.5,
+              -39.0
+            ],
+            [
+              -45.5,
+              19.5,
+              -39.0
+            ],
+            [
+              -47.2,
+              19.0,
+              -37.7
+            ]
+          ],
+          "style": "catmull-rom"
+        },
+        {
+          "id": "w1",
+          "from": {
+            "module": "arduino-uno-0",
+            "port": "Digital-D0~D7",
+            "pin": "D2"
+          },
+          "to": {
+            "module": "button-2",
+            "port": "Pin-A1",
+            "pin": "SIG"
+          },
+          "signal": "digital",
+          "color": "#44cc44",
+          "path3d": [
+            [
+              4.6,
+              0.0,
+              10.3
+            ],
+            [
+              4.6,
+              19.0,
+              10.3
+            ],
+            [
+              5.5,
+              19.5,
+              9.0
+            ],
+            [
+              -48.5,
+              19.5,
+              9.0
+            ],
+            [
+              -48.5,
+              19.5,
+              -36.0
+            ],
+            [
+              -47.2,
+              19.0,
+              -37.7
+            ]
+          ],
+          "style": "catmull-rom"
+        }
+      ],
+      "thermal_field": {
+        "heat_sources": [
+          {
+            "type": "Arduino-Uno-class",
+            "power_mw": 250.0
+          },
+          {
+            "type": "MP3-Module-class",
+            "power_mw": 1000.0
+          }
+        ],
+        "total_power_mw": 1250.0,
+        "needs_venting": false,
+        "vent_placements": [],
+        "estimated_dt_c": 17.9
+      },
+      "decisions": [
+        "Enclosure auto-sized to 106.1x87.0x23.3mm inner, fitting 2 packed modules",
+        "3D A* routed 2 wires (grid 3mm, 6-dir, turn penalty 2.0)",
+        "Thermal: 1250.0mW, vent=False, dT~17.9C",
+        "CoG: within 2/3 zone at [71.8, 29.1]",
+        "Face-mounted 1 panel part(s) on the lid with cutouts",
+        "Validation: all checks passed"
+      ],
+      "validation": {
+        "passed": true,
+        "checks_run": 5,
+        "checks_passed": 5,
+        "issues": []
+      }
+    }
+  }
+}

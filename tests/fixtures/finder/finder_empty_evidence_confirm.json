@@ -1,0 +1,12 @@
+{
+  "scan": "fallback-scan",
+  "findings": [
+    {
+      "id": "F2",
+      "title": "疑似 dead-code 頂替(填不出原始碼證據卻 confirm)",
+      "verdict": "confirm",
+      "evidence_bytes": "",
+      "reachability_path": []
+    }
+  ]
+}

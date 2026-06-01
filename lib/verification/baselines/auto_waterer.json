@@ -1,0 +1,10 @@
+{
+  "component_count": 5,
+  "total_ma": 355.0,
+  "budget_ok": true,
+  "bom_total_ntd": 560,
+  "enclosure_size": "medium",
+  "wall_thickness_mm": 2.0,
+  "pin_count": 3,
+  "wiring_nets": 3
+}

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>CADHLLM · STEM 6E AI Design System — v6</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.11.1/lib/elk.bundled.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+  // Preload component 3D model registry + mesh cache (Wave 3 integration)
+  // Starts fetching all mesh.json files in parallel with page parsing.
+  // scene-3d.js Priority 1 reads window.__MODEL_MESHES[key] synchronously;
+  // if a mesh hasn't arrived yet, Priority 2 (procedural builder) handles it.
+  window.__MODEL_MESHES = {};
+  window.__MESH_PRELOAD = fetch('models/registry.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(reg => {
+      window.__MODEL_REGISTRY = reg;
+      if (!reg) return;
+      const promises = [];
+      // Phase 1: fetch all mesh.json, store under exact registry key
+      for (const [shape, variants] of Object.entries(reg)) {
+        if (shape[0] === '_' || !Array.isArray(variants)) continue;
+        for (const v of variants) {
+          const key = [shape, v.pins || '', v.pitch || '', v.rows || ''].join(':');
+          const url = 'models/components/' + v.file.replace(/\.step$/i, '.mesh.json');
+          promises.push(
+            fetch(url).then(r => r.ok ? r.json() : null)
+              .then(d => { if (d) window.__MODEL_MESHES[key] = d; })
+              .catch(() => {})
+          );
+        }
+      }
+      return Promise.all(promises).then(() => {
+        // Phase 2: fuzzy aliases for partial key matches
+        // Covers: missing pitch, missing rows, missing pitch+rows, missing pins
+        const exact = Object.keys(window.__MODEL_MESHES);
+        for (const ek of exact) {
+          const [s, pins, pitch, rows] = ek.split(':');
+          if (!pins) continue;
+          const M = window.__MODEL_MESHES;
+          // shape:pins:: (missing pitch+rows)
+          const k1 = s+':'+pins+'::'; if (!M[k1]) M[k1] = M[ek];
+          // shape:pins:pitch: (missing rows)
+          if (pitch) { const k2 = s+':'+pins+':'+pitch+':'; if (!M[k2]) M[k2] = M[ek]; }
+          // shape:pins::rows (missing pitch)
+          if (rows)  { const k3 = s+':'+pins+'::'+rows;     if (!M[k3]) M[k3] = M[ek]; }
+        }
+        // Phase 3: shape-only fallback (shape:::) for ALL shapes
+        // Picks first variant as default; enables lookup when no params given
+        const defaults = {};
+        for (const ek of Object.keys(window.__MODEL_MESHES)) {
+          if (ek.includes(':::')) continue; // skip existing aliases
+          const s = ek.split(':')[0];
+          if (!defaults[s]) defaults[s] = ek;
+        }
+        for (const [s, dk] of Object.entries(defaults)) {
+          const sk = s + ':::';
+          if (!window.__MODEL_MESHES[sk]) window.__MODEL_MESHES[sk] = window.__MODEL_MESHES[dk];
+        }
+        // Phase 4: pitch+rows without pins (for generic headers)
+        for (const ek of exact) {
+          const [s, pins, pitch, rows] = ek.split(':');
+          if (pins && pitch) {
+            const noPins = s+'::'+pitch+':'+(rows||'');
+            if (!window.__MODEL_MESHES[noPins]) window.__MODEL_MESHES[noPins] = window.__MODEL_MESHES[ek];
+          }
+        }
+      });
+    })
+    .then(() => {
+      const n = Object.keys(window.__MODEL_MESHES).length;
+      if (n > 0) console.log('[mesh-preloader] %d mesh entries cached (incl. aliases)', n);
+    })
+    .catch(() => { window.__MODEL_REGISTRY = null; });
+</script>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // API 預設同源；僅當獨立 preview server (8082) 時才跨 port
+  if (window.location.port === '8082') {
+    window.CADHLLM_API_BASE = window.location.protocol + '//' + window.location.hostname + ':8000';
+  }
+</script>
+
+<!--
+  Cache-bust: _t=timestamp 確保每次 reload 都取最新 JSX。
+  開發階段使用；正式部署改回固定版號。
+-->
+<script>window.__CB = '?_t=' + Date.now();</script>
+<script>
+  // Babel standalone 需要靜態 script 標籤，但我們用 document.write 在解析階段注入
+  const _jsxFiles = [
+    // STR5: static config — must load before any file that reads window.* constants
+    'config/mcu-ports.js', 'config/stages-6e.js', 'config/option-hints.js', 'config/component-presets.js',
+    // STR1/STR2/STR3: 共用 hooks + data，需在其他 JSX 之前載入以掛載 window 全域
+    'data/component-dimensions.js', 'data/datasheet-derive.js', 'hooks/use-3d-interaction.js', 'hooks/use-three-renderer.js',
+    // STR4: 熱力視覺化工具函式（需在 assembly 之前載入）
+    'utils/thermal-helpers.js',
+    'data.jsx', 'api.jsx', 'adapters.jsx', 'store.jsx', 'ui-primitives.jsx', 'shell.jsx',
+    'views-engage.jsx',
+    // explore split — load data + panels before main view
+    'explore/explore-data.js', 'explore/explore-panels.jsx',
+    'views-explore.jsx',
+    // INF1-S1: schematic split — load sub-modules before main view
+    'schematic/comp-specs.js', 'schematic/schematic-fidelity.js', 'schematic/elk-layout.js', 'schematic/port-resolver.js',
+    'schematic-elk.jsx',
+    'views-explain.jsx',
+    // INF1-S3: engineer split — load sub-modules before main view
+    'engineer/shapes-ic-conn.js', 'engineer/shapes-passive-mech.js',
+    'engineer/render-fidelity.js',
+    'engineer/viewport-controls.js', 'engineer/scene-3d.js',
+    'views-engineer-code.jsx', 'views-engineer.jsx',
+    // Assembly V3 SceneGraph renderer (V2 renderer removed)
+    'components/ValidationPanel.jsx',
+    'views-engineer-assembly.jsx',
+    'views-engineer-assembly-v3.jsx',
+    // evaluate split — load sub-components before main view
+    'evaluate-cards.jsx', 'evaluate-fix-cards.jsx',
+    'views-evaluate.jsx', 'user-components/tag-pickers.jsx', 'views-user-components.jsx', 'tweaks-panel.jsx',
+  ];
+  _jsxFiles.forEach(f => document.write(
+    '<script type="text/babel" src="' + f + window.__CB + '"><\/script>'
+  ));
+</script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentHue": 200,
+  "bgTone": "dark",
+  "navStyle": "full",
+  "showComposer": true
+}/*EDITMODE-END*/;
+
+function ErrorBanner({ error, onDismiss }) {
+  if (!error) return null;
+  return (
+    <div style={{
+      position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1100,
+      background: 'var(--red-dim)', borderBottom: '1px solid var(--red)',
+      padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <span style={{ color: 'var(--red)', fontSize: 13, flex: 1 }}>⚠ {error}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} style={{
+          background: 'none', border: 'none', color: 'var(--red)',
+          cursor: 'pointer', fontSize: 16, padding: 4,
+        }}>✕</button>
+      )}
+    </div>
+  );
+}
+
+function ProgressOverlay({ messages, phase }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!messages || !messages.length) return null;
+  const last = messages[messages.length - 1] || '';
+  return (
+    <div
+      onClick={() => setExpanded(prev => !prev)}
+      style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 900,
+        background: 'var(--bg-glass)', backdropFilter: 'blur(12px)',
+        borderTop: '1px solid var(--border-subtle)',
+        cursor: 'pointer', userSelect: 'none',
+      }}
+    >
+      {expanded ? (
+        <div style={{ padding: '8px 16px', maxHeight: 120, overflowY: 'auto' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+            Phase {phase || '?'} 進行中 ▾
+          </div>
+          {messages.slice(-5).map((m, i) => (
+            <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{m}</div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+            background: 'var(--green)',
+          }} />
+          <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+            Phase {phase || '?'}
+          </span>
+          <span style={{
+            fontSize: 11, color: 'var(--text-secondary)',
+            flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{last}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>▴</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [currentView, setCurrentView] = React.useState('idle');
+  const [toast, setToast] = React.useState(null);
+
+  const store = usePipelineStore();
+
+  const navigate = React.useCallback((view) => {
+    setCurrentView(view);
+  }, []);
+
+  // Auto-navigate on pipeline status changes（demo 模式停用：用戶手動點各階段瀏覽）
+  React.useEffect(() => {
+    if (store.isCanned) return;
+    if (store.status === 'waiting_clarify' && store.clarifyQuestions.length > 0) {
+      if (currentView === 'idle') setCurrentView('clarify');
+    }
+  }, [store.status, store.clarifyQuestions.length, store.isCanned]);
+
+  React.useEffect(() => {
+    if (store.isCanned) return;
+    if (store.currentPhase >= 2 && store.extractSlots.length > 0) {
+      if (currentView === 'clarify') setCurrentView('extract');
+    }
+  }, [store.currentPhase, store.extractSlots.length, store.isCanned]);
+
+  // Phase 3 完成 → 自動導航到 schematic（fix_choice 阻擋 + demo 停用）
+  React.useEffect(() => {
+    if (store.isCanned) return;
+    if (store.currentPhase >= 3 && store.wiring?.length > 0 && !store.fixChoiceOptions) {
+      if (currentView === 'extract' || currentView === 'plan') setCurrentView('schematic');
+    }
+  }, [store.currentPhase, store.wiring?.length, store.fixChoiceOptions, store.isCanned]);
+
+  // Phase 4 完成 → 自動導航到 assembly（demo 停用）
+  React.useEffect(() => {
+    if (store.isCanned) return;
+    if (store.currentPhase >= 4 && store.componentPlacements?.length > 0 && !store.fixChoiceOptions) {
+      if (currentView === 'schematic' || currentView === 'plan') setCurrentView('assembly');
+    }
+  }, [store.currentPhase, store.componentPlacements?.length, store.fixChoiceOptions, store.isCanned]);
+
+  // waiting_hitl：Phase 2/3 fix_choice 留在 extract/plan 顯示 swap panel；
+  // Phase 6+ 才跳 evaluate（VLM HITL）
+  React.useEffect(() => {
+    if (store.status === 'waiting_hitl') {
+      const fcPhase = store.fixChoiceOptions?.phase;
+      if (fcPhase === 2) {
+        if (currentView !== 'extract' && currentView !== 'plan') setCurrentView('extract');
+      } else if (fcPhase === 3) {
+        if (currentView !== 'extract' && currentView !== 'plan' && currentView !== 'schematic')
+          setCurrentView('extract');
+      } else {
+        setCurrentView('evaluate');
+      }
+    }
+  }, [store.status, store.fixChoiceOptions?.phase]);
+
+  // Session restore on mount
+  React.useEffect(() => {
+    PipelineStore.restoreSession()?.then((job) => {
+      if (job) {
+        const phase = job.current_phase || 0;
+        if (phase >= 4) setCurrentView('assembly');
+        else if (phase >= 3) setCurrentView('schematic');
+        else if (phase >= 2) setCurrentView('extract');
+        else if (job.status === 'waiting_clarify') setCurrentView('clarify');
+        setToast('已恢復先前的工作階段');
+        setTimeout(() => setToast(null), 3000);
+      }
+    });
+  }, []);
+
+  const handleStartPipeline = React.useCallback((project, instruction) => {
+    PipelineStore.dispatch({
+      type: 'START_PIPELINE',
+      project,
+      instruction,
+    });
+  }, []);
+
+  const handleResumePipeline = React.useCallback((jobId, resumeFrom) => {
+    PipelineStore.dispatch({
+      type: 'RESUME_PIPELINE',
+      jobId,
+      resumeFrom,
+    });
+  }, []);
+
+  const handleSubmit = React.useCallback((text) => {
+    if (store.status === 'waiting_hitl' && store.jobId) {
+      API.sendHitl(store.jobId, 'user_input', { text }).catch(err => {
+        setToast(`HITL 錯誤：${err.message}`);
+        setTimeout(() => setToast(null), 3000);
+      });
+    } else if (store.status === 'idle' || store.status === 'done' || store.status === 'error') {
+      handleStartPipeline(text.slice(0, 30), text);
+    } else {
+      setToast('▸ Pipeline 執行中，請等待完成');
+      setTimeout(() => setToast(null), 3000);
+    }
+  }, [store.status, store.jobId, handleStartPipeline]);
+
+  // Toast from custom events
+  React.useEffect(() => {
+    const handler = (e) => { setToast(e.detail); setTimeout(() => setToast(null), 3000); };
+    document.addEventListener('cadhllm:toast', handler);
+    return () => document.removeEventListener('cadhllm:toast', handler);
+  }, []);
+
+  // Dynamic accent from tweak
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--accent', `oklch(0.75 0.16 ${tweaks.accentHue})`);
+    document.documentElement.style.setProperty('--accent-dim', `oklch(0.75 0.16 ${tweaks.accentHue} / 0.15)`);
+    document.documentElement.style.setProperty('--accent-hover', `oklch(0.80 0.18 ${tweaks.accentHue})`);
+  }, [tweaks.accentHue]);
+
+  const VIEW_MAP = {
+    idle:      IdleView,
+    clarify:   ClarifyView,
+    extract:   ExtractView,
+    plan:      PlanView,
+    schematic: SchematicView,
+    'components-3d': ComponentsView,
+    assembly:  AssemblyView,
+    code:      CodeView,
+    bom:       BomView,
+    'user-components': UserComponentsView,
+    evaluate:  EvaluateView,
+  };
+
+  const ViewComp = VIEW_MAP[currentView] || IdleView;
+
+  const viewProps = {
+    onNavigate: navigate,
+    onSubmit: handleSubmit,
+    onStartPipeline: handleStartPipeline,
+    onResumePipeline: handleResumePipeline,
+    store,
+  };
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: '100%', overflow: 'hidden',
+    }}>
+      <TopNav
+        currentView={currentView}
+        onNavigate={navigate}
+        pipelinePhase={store.currentPhase}
+        pipelineStatus={store.status}
+        navStyle={tweaks.navStyle}
+        sseStatus={store.sseStatus}
+        isCanned={store.isCanned}
+        templateId={store.templateId}
+        onFork={async () => {
+          if (!store.templateId) return;
+          try {
+            const r = await fetch('/api/v1/projects/fork', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ template_id: store.templateId }),
+            });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+            PipelineStore.dispatch({
+              type: 'RESTORE_FROM_JOB',
+              payload: { job_id: data.job_id, status: data.status, current_phase: 5 },
+              bridge: await fetch(`/canned/${store.templateId}.json`).then(x => x.json()),
+            });
+            setToast(`✓ Fork 成功：新專案 ${data.job_id.slice(0, 8)}…`);
+            setTimeout(() => setToast(null), 3000);
+          } catch (err) {
+            setToast(`Fork 失敗：${err.message}`);
+            setTimeout(() => setToast(null), 3000);
+          }
+        }}
+      />
+      {/* Main content */}
+      <main style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg-0)' }}>
+        <ErrorBanner
+          error={store.error}
+          onDismiss={() => PipelineStore.dispatch({ type: 'SSE_ERROR', payload: null })}
+        />
+
+        <ViewComp {...viewProps} />
+
+        {store.sseStatus === 'reconnecting' && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 950,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(3px)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '14px 24px', borderRadius: 'var(--r-md)',
+              background: 'var(--bg-2)', border: '1px solid var(--accent)',
+              boxShadow: 'var(--shadow-md)',
+            }}>
+              <Spinner size={16} />
+              <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>連線中斷，正在重新連線⋯</span>
+            </div>
+          </div>
+        )}
+
+        {store.status === 'running' && store.phaseMessages.length > 0 && (
+          <ProgressOverlay messages={store.phaseMessages} phase={store.currentPhase} />
+        )}
+
+        {/* Toast */}
+        {toast && (
+          <div style={{
+            position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--bg-2)', border: '1px solid var(--accent)',
+            borderRadius: 'var(--r-md)', padding: '10px 20px',
+            fontSize: 13, color: 'var(--accent)', boxShadow: 'var(--shadow-md)',
+            zIndex: 1000, animation: 'viewFadeIn 0.2s var(--ease-out)',
+          }}>{toast}</div>
+        )}
+      </main>
+
+      {/* Composer */}
+      {tweaks.showComposer && currentView !== 'idle' && (
+        <Composer
+          onSubmit={handleSubmit}
+          currentView={currentView}
+          pipelineStatus={store.status}
+        />
+      )}
+
+      {/* Tweaks Panel */}
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Accent Hue">
+          <TweakSlider value={tweaks.accentHue} onChange={v => setTweak('accentHue', v)} min={0} max={360} step={5} />
+          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+            {[55, 250, 155, 300, 25, 200].map(h => (
+              <button key={h} onClick={() => setTweak('accentHue', h)} style={{
+                width: 22, height: 22, borderRadius: '50%',
+                background: `oklch(0.75 0.16 ${h})`, border: tweaks.accentHue === h ? '2px solid white' : '2px solid transparent',
+                cursor: 'pointer',
+              }} />
+            ))}
+          </div>
+        </TweakSection>
+        <TweakSection title="Navigation">
+          <TweakRadio
+            value={tweaks.navStyle}
+            onChange={v => setTweak('navStyle', v)}
+            options={[
+              { value: 'full', label: 'Full' },
+              { value: 'compact', label: 'Compact' },
+            ]}
+          />
+        </TweakSection>
+        <TweakSection title="Composer Bar">
+          <TweakToggle value={tweaks.showComposer} onChange={v => setTweak('showComposer', v)} label="Show on inner pages" />
+        </TweakSection>
+        <TweakSection title="Quick Nav">
+          {Object.keys(VIEW_MAP).map(v => (
+            <TweakButton key={v} label={VIEW_META[v]?.label || v} onClick={() => navigate(v)} />
+          ))}
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

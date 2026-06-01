@@ -1,0 +1,15 @@
+# Phase I LoRA Training — Colab 專用
+# Colab 已預裝 torch / CUDA，只需安裝以下套件：
+#   pip install -r requirements.txt
+
+# Core
+transformers>=4.45.0
+peft>=0.13.0
+trl>=0.12.0
+datasets>=3.0.0
+accelerate>=1.0.0
+bitsandbytes>=0.44.0
+sentencepiece>=0.2.0
+
+# unsloth（4bit LoRA）
+unsloth

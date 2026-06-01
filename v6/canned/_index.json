@@ -1,0 +1,162 @@
+[
+  {
+    "id": "auto_waterer",
+    "name": "自動澆花器",
+    "category": "Gardening",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 355.0,
+    "budget_ma": 800,
+    "power_ok": true
+  },
+  {
+    "id": "plant_monitor",
+    "name": "植物監測儀",
+    "category": "Gardening",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 76.5,
+    "budget_ma": 800,
+    "power_ok": true
+  },
+  {
+    "id": "smart_nightlight",
+    "name": "智慧小夜燈",
+    "category": "Smart_Home",
+    "scope": "in_scope",
+    "components_count": 4,
+    "total_ma": 71.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "auto_curtain",
+    "name": "自動窗簾",
+    "category": "Smart_Home",
+    "scope": "layer4",
+    "components_count": 5,
+    "total_ma": 561.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "voice_doorbell",
+    "name": "語音門鈴",
+    "category": "Smart_Home",
+    "scope": "in_scope",
+    "components_count": 4,
+    "total_ma": 200.5,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "rc_car",
+    "name": "遙控車",
+    "category": "Robotics",
+    "scope": "in_scope",
+    "components_count": 6,
+    "total_ma": 735.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "obstacle_car",
+    "name": "避障車",
+    "category": "Robotics",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 665.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "talking_robot",
+    "name": "說話機器人",
+    "category": "Robotics",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 285.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "music_box",
+    "name": "音樂盒",
+    "category": "Interactive_Art",
+    "scope": "in_scope",
+    "components_count": 4,
+    "total_ma": 200.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "lightsaber",
+    "name": "光劍",
+    "category": "Interactive_Art",
+    "scope": "layer4",
+    "components_count": 5,
+    "total_ma": 750.5,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "electronic_keyboard",
+    "name": "電子琴",
+    "category": "Interactive_Art",
+    "scope": "in_scope",
+    "components_count": 4,
+    "total_ma": 79.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "burglar_alarm",
+    "name": "防盜鈴",
+    "category": "Security",
+    "scope": "in_scope",
+    "components_count": 4,
+    "total_ma": 145.0,
+    "budget_ma": 800,
+    "power_ok": true
+  },
+  {
+    "id": "access_control",
+    "name": "門禁系統",
+    "category": "Security",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 342.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "alarm_siren",
+    "name": "警報器",
+    "category": "Security",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 100.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "countdown_timer",
+    "name": "倒數計時器",
+    "category": "Education",
+    "scope": "in_scope",
+    "components_count": 5,
+    "total_ma": 101.0,
+    "budget_ma": 1000,
+    "power_ok": true
+  },
+  {
+    "id": "voice_guide",
+    "name": "語音導覽機",
+    "category": "Education",
+    "scope": "in_scope",
+    "components_count": 4,
+    "total_ma": 202.0,
+    "budget_ma": 800,
+    "power_ok": true
+  }
+]

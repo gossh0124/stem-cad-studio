@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════
+   CADHLLM Design System · V6 Tokens
+   v4 architecture + v5 visual polish
+   ═══════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── surfaces ── */
+  --bg-0: #0c0c10;
+  --bg-1: #121218;
+  --bg-2: #1a1a24;
+  --bg-3: #22222f;
+  --bg-4: #2a2a3a;
+  --bg-hover: rgba(255,255,255,0.04);
+  --bg-active: rgba(255,255,255,0.07);
+  --bg-glass: rgba(18,18,24,0.85);
+
+  /* ── borders ── */
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.16);
+
+  /* ── text ── */
+  --text-primary: #ededf0;
+  --text-secondary: #8e8ea0;
+  --text-tertiary: #5a5a6e;
+  --text-inverse: #0c0c10;
+
+  /* ── accents ── */
+  --accent: oklch(0.75 0.16 55);
+  --accent-dim: oklch(0.75 0.16 55 / 0.15);
+  --accent-hover: oklch(0.80 0.18 55);
+  --accent-2: oklch(0.72 0.14 250);
+  --accent-2-dim: oklch(0.72 0.14 250 / 0.12);
+  --green: oklch(0.78 0.18 155);
+  --green-dim: oklch(0.78 0.18 155 / 0.12);
+  --red: oklch(0.70 0.20 25);
+  --red-dim: oklch(0.70 0.20 25 / 0.12);
+  --purple: oklch(0.72 0.16 300);
+
+  /* ── 6E stage colors ── */
+  --6e-engage:   oklch(0.75 0.16 55);
+  --6e-explore:  oklch(0.72 0.14 250);
+  --6e-explain:  oklch(0.78 0.18 155);
+  --6e-engineer: oklch(0.72 0.16 300);
+  --6e-enrich:   oklch(0.72 0.14 200);
+  --6e-evaluate: oklch(0.70 0.20 25);
+
+  /* ── type ── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+  /* ── radii ── */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-full: 9999px;
+
+  /* ── shadows ── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 24px rgba(0,0,0,0.6);
+
+  /* ── easing (from v5) ── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html, body, #root {
+  height: 100%; width: 100%;
+  background: var(--bg-0);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+.mono { font-family: var(--font-mono); }
+
+/* ── Animations (from v5) ── */
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes viewFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,136,0); }
+  50% { box-shadow: 0 0 8px 2px rgba(0,255,136,0.2); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+@keyframes progressSweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
+}
+@keyframes chipStagger {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

@@ -1,0 +1,10 @@
+{
+  "scan": "legacy-format",
+  "findings": [
+    {
+      "id": "F4",
+      "title": "verdict 未填(舊格式) — 向後相容視為 cannot_confirm",
+      "verdict": null
+    }
+  ]
+}
