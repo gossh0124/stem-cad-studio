@@ -27,6 +27,7 @@
 ## 快速開始
 
 ```bash
+# 需 Python >= 3.12（程式碼使用 PEP 701 f-string 語法）
 # Python 一律用 venv（不要用系統 Python）
 python -m venv .venv
 .venv/Scripts/pip install -r services/requirements.txt   # Windows
