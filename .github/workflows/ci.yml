@@ -49,6 +49,7 @@ jobs:
         #   TestShellExists / TestShellVariants           → 需生成的 *.step / shells/（.gitignore 排除）
         #   TestModelRegistry::test_real_registry_passes  → 同上（registry 宣告的 .step 不在 tracked tree）
         #   test_empty_placements_raises                  → 需 build123d（精簡 CI 不裝；見 issue 追蹤）
+        #   TestResolveStlPath::test_absolute_path        → Windows 路徑語意（C:/ 在 POSIX 非絕對；見 issue 追蹤）
         run: |
           pytest tests/ -q -p no:cacheprovider --tb=short \
             --ignore=tests/test_eagle_parse.py \
@@ -56,4 +57,5 @@ jobs:
             --deselect "tests/test_assembly_placement.py::TestShellExists" \
             --deselect "tests/test_assembly_placement.py::TestShellVariants::test_every_type_has_geometry" \
             --deselect "tests/test_contract.py::TestModelRegistry::test_real_registry_passes" \
-            --deselect "tests/test_shell_validation.py::TestBuildAssemblyValidation::test_empty_placements_raises"
+            --deselect "tests/test_shell_validation.py::TestBuildAssemblyValidation::test_empty_placements_raises" \
+            --deselect "tests/test_validate_cad.py::TestResolveStlPath::test_absolute_path"
