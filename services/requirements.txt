@@ -5,14 +5,18 @@ pydantic>=2.7.0
 python-multipart>=0.0.9
 PyJWT>=2.8.0
 
+# 驗證 / schema（lib/validator、lib/cad/hl_dsl 硬依賴）
+jsonschema>=4.0.0
+
 # CAD（本地選裝，Colab 用 cadquery）
 # cadquery>=2.4.0
 # build123d>=0.7.0
 trimesh>=4.0.0
 numpy>=1.26.0
 
-# VLM 驗證（選裝）
+# VLM 驗證（選裝；lib/verification/l0_integrity 用 Pillow 讀渲染圖）
 anthropic>=0.28.0
+Pillow>=10.0.0
 
 # RAG（元件語義搜尋 + 歷史案例檢索）
 lancedb>=0.16.0

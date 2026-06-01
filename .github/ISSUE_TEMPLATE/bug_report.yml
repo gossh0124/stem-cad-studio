@@ -1,0 +1,50 @@
+name: Bug 回報
+description: 回報錯誤行為或非預期結果
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝回報。請盡量提供可重現步驟與環境資訊。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 問題描述
+      description: 發生什麼？預期是什麼？
+      placeholder: 描述非預期行為與你預期的正確行為
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 重現步驟
+      description: 如何重現？包含輸入的 prompt / 階段 / 元件
+      placeholder: |
+        1. 啟動 server `python run_server.py`
+        2. 輸入 prompt「...」
+        3. 在 Phase ... 看到 ...
+    validations:
+      required: true
+  - type: input
+    id: phase
+    attributes:
+      label: 相關階段 / 模組
+      description: 哪個 Phase（I–VII）或 lib 模組？
+      placeholder: "例如 Phase IV / lib/cad/shell"
+  - type: textarea
+    id: env
+    attributes:
+      label: 環境
+      description: OS、Python 版本、是否裝 build123d / RAG 依賴
+      placeholder: "Windows 11 / Python 3.11 / build123d 未裝"
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 影響程度
+      options:
+        - P0 立即阻塞
+        - P1 高影響
+        - P2 中等
+        - P3 低 / 長期
+    validations:
+      required: true

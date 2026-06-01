@@ -1,0 +1,33 @@
+name: 功能請求
+description: 提議新功能或改進
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解決的問題
+      description: 這個功能要解決什麼痛點？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提議做法
+      description: 你希望它如何運作？
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope 檢查
+      description: 是否落在「文字 → 可製造 STEM CAD」範圍內？（切片 / FEM / 戶外密封 / 多軸機構為 scope 外）
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 優先級
+      options:
+        - P1 高影響
+        - P2 中等
+        - P3 低 / 長期
+    validations:
+      required: true

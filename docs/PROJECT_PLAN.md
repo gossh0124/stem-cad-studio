@@ -2,6 +2,8 @@
 
 > 版本：v3.0 | 日期：2026-05-03  
 > 自然語言 → 端到端 3D 列印 STEM 作品，遵循 6E 教育框架
+>
+> **本檔為設計期文件**：階段（phase）與架構的**權威現況**以 [ROADMAP.md](ROADMAP.md) 為準（對齊 `services/phase_handlers/` 實際 handler）。本檔保留供設計沿革參考。
 
 ---
 

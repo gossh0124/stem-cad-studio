@@ -8,15 +8,17 @@
 
 ## 它做什麼（7 階段 pipeline → 6E）
 
-| 階段 | 產物 |
-|------|------|
-| Phase I 意圖理解 | 專題分類 + BOM 草案 |
-| Phase II 釐清提問 | 人機問答補足規格 (HITL) |
-| Phase III 元件解析 | 真實型號確認（Arduino / ESP32 / micro:bit / 感測器）+ 約束驗證 |
-| Phase IV 規劃設計 | 子系統分配 + 功率預算 |
-| Phase V 電路圖 | ELK 佈局 schematic + 接線分配 |
-| Phase VI 3D 模型 | 外殼 + PCB + 元件配置 → 可列印 STL |
-| Phase VII 程式碼 | Arduino 韌體合成 + 組裝 SOP |
+| 階段 | Handler | 產物 |
+|------|---------|------|
+| Phase I 意圖理解 | `phase1` | LoRA-A 推論：專題分類 + 子系統規劃 + BOM 草案 |
+| Phase II 規格補全 | `phase2` | Component Registry（SSOT）補全真實型號 spec / 尺寸 / port / 鎖孔 |
+| Phase III 電氣工程 | `phase3` | 功率預算 + IO 衝突驗證 + 接線分配 + ELK schematic + BOM.md |
+| Phase IV 機構工程 | `phase4` | 元件佈局（assembly_solver）+ 外殼幾何 + 多元件組裝 → 可列印 STL |
+| Phase V 輸出渲染 | `phase5` | 多視圖 PNG + Three.js 3D 檢視 + Arduino 韌體合成 |
+| Phase VI 驗證閉環 | （併入 V / QA） | VLM / contract 驗證 — 無獨立 handler，整合於輸出與 QA gate |
+| Phase VII 人工修正 | `phase7` | HITL 人機互動修正（lock-file 非同步閉環） |
+
+> 上表階段定義以 `services/phase_handlers/` 實際 handler 為準（權威路線見 [docs/ROADMAP.md](docs/ROADMAP.md)）。
 
 各階段共用一份逐步累積的 **Bridge JSON**。內建 16 個 demo 範本（自動澆花器 / 紅外避障車 / 電子琴 / 門禁 …）。
 

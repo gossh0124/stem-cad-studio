@@ -1,0 +1,59 @@
+name: CI
+
+# 產品 CI：SSOT drift gate + 產品 pytest。
+# 精簡 runner 不裝重依賴（build123d / lancedb / sentence-transformers / torch）；
+# 需 CAD 引擎或 RAG 的測試會自動 skip。需第三方 datasheet（data/pcb_sources/）或
+# 生成幾何（*.step / shells/，.gitignore 排除）的測試在此 deselect — fresh clone 無法跑。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  drift-gates:
+    name: SSOT drift gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install minimal deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pyyaml
+      - name: Gate 1 — derive component dimensions (43 classes, position-strict)
+        run: python scripts/derive_component_dimensions.py --check
+      - name: Gate 2 — core dimensions drift (tol=0.1mm)
+        run: python scripts/test_dimensions_drift.py
+
+  pytest:
+    name: Product pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy pyyaml trimesh jsonschema pillow
+      - name: Run product test suite
+        # Deselect/ignore — 皆因 repo 未散布的資產，非程式碼缺陷：
+        #   test_eagle_parse / test_layout_export        → 需 data/pcb_sources/*.brd（第三方版權，未散布）
+        #   TestShellExists / TestShellVariants           → 需生成的 *.step / shells/（.gitignore 排除）
+        #   TestModelRegistry::test_real_registry_passes  → 同上（registry 宣告的 .step 不在 tracked tree）
+        #   test_empty_placements_raises                  → 需 build123d（精簡 CI 不裝；見 issue 追蹤）
+        run: |
+          pytest tests/ -q -p no:cacheprovider --tb=short \
+            --ignore=tests/test_eagle_parse.py \
+            --ignore=tests/test_layout_export.py \
+            --deselect "tests/test_assembly_placement.py::TestShellExists" \
+            --deselect "tests/test_assembly_placement.py::TestShellVariants::test_every_type_has_geometry" \
+            --deselect "tests/test_contract.py::TestModelRegistry::test_real_registry_passes" \
+            --deselect "tests/test_shell_validation.py::TestBuildAssemblyValidation::test_empty_placements_raises"

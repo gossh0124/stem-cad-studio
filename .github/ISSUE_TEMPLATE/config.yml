@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 開發路線圖
+    url: https://github.com/gossh0124/stem-cad-studio/blob/main/docs/ROADMAP.md
+    about: 開議題前先看路線圖與目前里程碑（含 scope 邊界）。
