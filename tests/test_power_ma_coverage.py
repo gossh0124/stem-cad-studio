@@ -21,8 +21,14 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATASHEET_PATH = os.path.join(_ROOT, "data", "component_datasheet_verified.json")
 
 # Components present in POWER_MA but intentionally absent from COMPONENT_REGISTRY
-# (planning-level specs not yet modelled as physical components)
-_REGISTRY_EXEMPT = frozenset({"Arduino-Nano-class", "ESP8266-class"})
+# (planning-level specs / alias-variant power sources not modelled as distinct physical
+# components). The 3 variant power sources (#20) resolve via COMPONENT_NAME_ALIASES to
+# their canonical class for geometry/BOM, but carry their own read-through supply-budget
+# (POWER_BUDGET_MA) and supply-component 0-consumption row (_fallback.power_ma=0).
+_REGISTRY_EXEMPT = frozenset({
+    "Arduino-Nano-class", "ESP8266-class",
+    "USB-Buck-5V-class", "LiPo-Charger-class", "BatteryHolder-AA-class",
+})
 
 # Supply components: act as power sources, so current_ma in registry reflects
 # output capacity, not consumption — POWER_MA correctly records 0.0 for them.
@@ -56,9 +62,18 @@ def _load_helpers_current_ma():
 
 class TestPowerMaCompleteness:
     def test_power_ma_count_exact(self):
-        """POWER_MA must contain exactly 45 entries — accidental add/remove detection."""
-        assert len(POWER_MA) == 45, (
-            f"Expected 45 entries, got {len(POWER_MA)}. "
+        """POWER_MA must contain exactly 49 entries — accidental add/remove detection.
+
+        48 → 49 (2026-06-13): +Battery-4AA-class (6V 4xAA holder for servo loads),
+        a power source at _fallback.power_ma=0.0 (consumes 0), consistent with peers.
+
+        45 → 48 (#20): the 3 alias-variant power sources (USB-Buck-5V / LiPo-Charger /
+        BatteryHolder-AA) were added to _fallback.power_ma=0.0 — they are supply
+        components (consume 0), consistent with the other power sources already at 0,
+        and are required by POWER_BUDGET_MA's read-through supply-budget (single source).
+        """
+        assert len(POWER_MA) == 49, (
+            f"Expected 49 entries, got {len(POWER_MA)}. "
             f"Keys: {sorted(POWER_MA)}"
         )
 

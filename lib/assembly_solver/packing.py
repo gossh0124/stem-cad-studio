@@ -109,10 +109,31 @@ def _escalate_overflow(
     new_panel = panel_comps + moved_to_panel
 
     new_enc = {"inner_length": inner_l, "inner_width": inner_w, "inner_height": inner_h}
-    if remaining and sum(c.L * c.W for c in remaining) > target_area:
-        new_l = round(max(inner_l, max(c.L for c in remaining) + _CLEARANCE_MM * 2) * 1.2, 1)
-        new_w = round((sum(c.W for c in remaining) + _CLEARANCE_MM * (len(remaining) + 1)) * 1.2, 1)
-        new_h = round(max(inner_h, max(c.H for c in remaining) * 1.2), 1)
+    # Resize trigger: area-target overflow OR geometric non-fit. A component can
+    # exceed the shell geometrically (its L/W larger than inner dims, with
+    # clearance) while the *area* target is still satisfied — draining by area
+    # alone never resizes, so the re-pack stays overflowing. Detect that case
+    # using the smallest-footprint orientation each remaining comp can take.
+    over_area = remaining and sum(c.L * c.W for c in remaining) > target_area
+    pad2 = _CLEARANCE_MM * 2
+
+    def _fits(c) -> bool:
+        # A comp fits (in some orientation) only if both sides + clearance land
+        # inside the shell. Either L→length / W→width, or rotated.
+        return ((c.L + pad2 <= inner_l and c.W + pad2 <= inner_w) or
+                (c.W + pad2 <= inner_l and c.L + pad2 <= inner_w))
+
+    over_geom = any(not _fits(c) for c in remaining)
+    if over_area or over_geom:
+        # Drive new dims from actual component needs (not a fixed +20% of the old
+        # shell): length covers the widest single comp, width stacks every
+        # remaining comp's shorter side; both padded by clearance, then a 20%
+        # growth margin for routing/assembly headroom.
+        long_side = max((max(c.L, c.W) for c in remaining), default=inner_l)
+        short_sum = sum(min(c.L, c.W) for c in remaining)
+        new_l = round(max(inner_l, long_side + _CLEARANCE_MM * 2) * 1.2, 1)
+        new_w = round(max(inner_w, short_sum + _CLEARANCE_MM * (len(remaining) + 1)) * 1.2, 1)
+        new_h = round(max(inner_h, max((c.H for c in remaining), default=inner_h) * 1.2), 1)
         new_enc = {"inner_length": new_l, "inner_width": new_w, "inner_height": new_h}
         escalations.append(f"shell_resize:{inner_l:.0f}x{inner_w:.0f}→{new_l:.0f}x{new_w:.0f}mm")
 
@@ -318,17 +339,34 @@ def _check_cog(
 
         cog_x2 = sum((c.x + c.L / 2) * c.weight_g for c in comps) / total_w
         cog_y2 = sum((c.y + c.W / 2) * c.weight_g for c in comps) / total_w
-        decisions.append(_Decision(
-            step="cog_check",
-            principle="重心穩定（PV4）",
-            description=(
-                f"重心 ({cog_x:.1f}, {cog_y:.1f}) 偏離中央 2/3 區域，"
-                f"已將最重元件 {heaviest.type.replace('-class', '')} "
-                f"({heaviest.weight_g:.0f}g) 移至中心，"
-                f"修正後重心 ({cog_x2:.1f}, {cog_y2:.1f})。"
-            ),
-            formula="CoG ∈ [L/6, 5L/6] × [W/6, 5W/6]",
-        ))
+        ok2 = (abs(cog_x2 - center_x) <= margin_x and
+               abs(cog_y2 - center_y) <= margin_y)
+        if ok2:
+            decisions.append(_Decision(
+                step="cog_check",
+                principle="重心穩定（PV4）",
+                description=(
+                    f"重心 ({cog_x:.1f}, {cog_y:.1f}) 偏離中央 2/3 區域，"
+                    f"已將最重元件 {heaviest.type.replace('-class', '')} "
+                    f"({heaviest.weight_g:.0f}g) 移至中心，"
+                    f"修正後重心 ({cog_x2:.1f}, {cog_y2:.1f}) 落回 2/3 區域 ✓"
+                ),
+                formula="CoG ∈ [L/6, 5L/6] × [W/6, 5W/6]",
+            ))
+        else:
+            decisions.append(_Decision(
+                step="cog_check",
+                principle="重心穩定（PV4）",
+                description=(
+                    f"重心 ({cog_x:.1f}, {cog_y:.1f}) 偏離中央 2/3 區域，"
+                    f"已將最重元件 {heaviest.type.replace('-class', '')} "
+                    f"({heaviest.weight_g:.0f}g) 移至中心，但修正後重心 "
+                    f"({cog_x2:.1f}, {cog_y2:.1f}) 仍偏離中央 2/3 區域"
+                    f"（中心 {center_x:.1f}, {center_y:.1f}）——"
+                    "單一元件重置不足以平衡,建議重新分配重元件或加大殼體。"
+                ),
+                formula="CoG ∈ [L/6, 5L/6] × [W/6, 5W/6]",
+            ))
 
 
 def _layout_panel(
@@ -407,6 +445,7 @@ def _orient_ports(
             oriented.append(f"{c.type.replace('-class', '')} USB→{nearest}")
         else:
             c.face_out = nearest
+            oriented.append(f"{c.type.replace('-class', '')}→{nearest}")
 
     decisions.append(_Decision(
         step="port_orient",

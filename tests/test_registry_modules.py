@@ -298,7 +298,8 @@ class TestModuleCounts:
     """Verify expected component counts per module."""
 
     def test_mcu_count(self):
-        assert len(MCU_COMPONENTS) == 4
+        # Uno, Arduino-Nano, ESP32, RaspberryPi (infra-dormant after deprecate), Microbit
+        assert len(MCU_COMPONENTS) == 5
 
     def test_sensors_has_several(self):
         assert len(SENSOR_COMPONENTS) >= 5

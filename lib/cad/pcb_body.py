@@ -111,6 +111,7 @@ from lib.cad.pcb_common import (  # noqa: E402
     tube_x as _tube_x,
     notched_box as _notched_box,
     rounded_can as _rounded_can,
+    export_glb as _export_glb,
 )
 
 
@@ -379,72 +380,9 @@ def _add_header_row(parts: list, pz: float,
 # ---------------------------------------------------------------------------
 # 匯出（GLB 多色 → 落回 STL 單色）
 # ---------------------------------------------------------------------------
-def _export_glb(compound: bd.Compound, path: str) -> bool:
-    """嘗試匯出 GLB（保留個別元件顏色）。成功回 True。"""
-    try:
-        import trimesh
-        import numpy as np
-    except ImportError:
-        return False
-
-    import logging
-    log = logging.getLogger(__name__)
-
-    meshes: list = []
-    errors: list[str] = []
-    color_set: set[tuple] = set()
-    n_teal = 0
-    total = len(compound.children)
-
-    for i, child in enumerate(compound.children):
-        label = getattr(child, 'label', f'child_{i}')
-        try:
-            verts, faces = child.tessellate(tolerance=0.05)
-            # RF1: build123d Z-up → glTF Y-up convention. (x,y,z) → (x, z, -y)
-            verts_np = np.array([(v.X, v.Z, -v.Y) for v in verts], dtype=np.float64)
-            faces_np = np.array(faces, dtype=np.int64)
-            if len(verts_np) == 0 or len(faces_np) == 0:
-                continue
-            m = trimesh.Trimesh(vertices=verts_np, faces=faces_np,
-                                process=False)
-            _ = m.vertex_normals
-
-            c = child.color
-            if c:
-                cv = list(c)
-                rgba = [int(cv[0] * 255), int(cv[1] * 255), int(cv[2] * 255), 255]
-            else:
-                rgba = [0, 84, 107, 255]
-                n_teal += 1
-            color_set.add(tuple(rgba[:3]))
-            pbr = trimesh.visual.material.PBRMaterial(
-                baseColorFactor=[rgba[0] / 255.0, rgba[1] / 255.0,
-                                 rgba[2] / 255.0, 1.0])
-            m.visual = trimesh.visual.TextureVisuals(material=pbr)
-            meshes.append(m)
-        except Exception as exc:
-            errors.append(f'{label}: {exc}')
-
-    if n_teal:
-        log.warning('_export_glb: %d children color=None (teal fallback)', n_teal)
-    if len(color_set) < 3 and len(meshes) > 10:
-        log.warning('_export_glb: low color diversity: %d unique in %d meshes',
-                    len(color_set), len(meshes))
-
-    if errors:
-        raise RuntimeError(
-            f"GLB export incomplete: {len(errors)}/{total} mesh(es) failed to tessellate. "
-            f"First error: {errors[0]}"
-        )
-
-    if not meshes:
-        return False
-
-    scene = trimesh.Scene(meshes)
-    scene.export(path, file_type='glb')
-    return True
-
-
+# _export_glb 由 lib.cad.pcb_common.export_glb 提供（見上方 import 別名）。
+# 該共用版本含 os.makedirs 目錄保護，並把 teal/低色彩多樣性 fallback 升級為
+# RuntimeError，避免在兩處重複維護同一份匯出邏輯。
 def export_arduino_pcb(output_dir: str) -> str:
     """建立 Arduino Uno R3 PCB 並匯出。
 

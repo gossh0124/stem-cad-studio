@@ -221,10 +221,19 @@ def solve_steady_state(
         # Single node: simple R*P calculation
         return _solve_diagonal(network, ambient_c)
 
-    if _HAS_NUMPY and network.get('adjacency'):
+    if network.get('adjacency'):
+        if not _HAS_NUMPY:
+            # Multi-node board WITH coupling but numpy missing: refuse to
+            # silently drop inter-node coupling (off-diagonal G terms), which
+            # would yield systematically lower/incorrect junction temps with
+            # no surfaced error. Zero-fallback: surface the deployment defect.
+            raise RuntimeError(
+                "coupled thermal solve requires numpy: network has "
+                f"{len(network['adjacency'])} coupling edge(s) but numpy is "
+                "unavailable; refusing to return a coupling-free approximation")
         return _solve_with_numpy(network, ambient_c)
 
-    # Fallback: diagonal solve (no inter-node coupling)
+    # No coupling adjacency: diagonal solve is exact (no inter-node terms).
     return _solve_diagonal(network, ambient_c)
 
 
@@ -291,3 +300,42 @@ def thermal_rc_report(
         'warnings': warnings,
         'board_name': pcb_spec.name,
     }
+
+
+def ic_thermal_for(comp_type: str, mode: str = 'typical') -> list:
+    """A5.1: per-IC steady-state junction temps for a module's PCB, joined with board
+    position, for the assembly scene graph (renderer colours the matching mesh part).
+
+    Returns [] for modules whose PCB has no sub-components carrying rth_ja_cw>0 (or no
+    PCBSpec at all). Zero-fallback: if a PCB DOES have thermal sub-components but the
+    RC solve yields no nodes, raise rather than silently emit [] — a solve regression
+    must surface, never be masked as "no thermal data".
+    """
+    from lib.pcb import PCB_REGISTRY  # lazy import to avoid circular-import risk
+    pcb_spec = PCB_REGISTRY.get(comp_type)
+    if pcb_spec is None:
+        return []
+    subs = list(getattr(pcb_spec, 'sub_components', None) or [])
+    thermal_subs = [sc for sc in subs if getattr(sc, 'rth_ja_cw', 0.0) > 0]
+    if not thermal_subs:
+        return []
+    report = thermal_rc_report(pcb_spec, mode=mode)
+    nodes = {nd['name']: nd for nd in report.get('nodes', [])}
+    if not nodes:
+        raise ValueError(
+            f"{comp_type}: PCB has {len(thermal_subs)} thermal sub-components but "
+            "thermal_rc_report returned no nodes (refusing silent empty ic_thermal)")
+    out: list = []
+    for sc in thermal_subs:
+        nd = nodes.get(sc.name)
+        if nd is None:
+            continue
+        out.append({
+            'name': sc.name,
+            'temp_c': round(nd['temp_c'], 2),
+            'delta_t': round(nd['delta_t'], 2),
+            'power_mw': round(nd.get('power_mw', getattr(sc, 'thermal_typical_mw', 0.0)), 1),
+            'anchor_x': sc.anchor_x, 'anchor_y': sc.anchor_y,
+            'body_l': sc.body_l, 'body_w': sc.body_w,
+        })
+    return out

@@ -6,6 +6,7 @@
     rule_id         str   — 唯一識別碼（CAP-NNN）
     description     str   — 人類可讀說明
     intent_patterns list  — 比對 _instruction 的 regex list（任一命中即觸發）
+    exclude_patterns list — （選填）regex list；任一命中 _instruction → 跳過此規則（negative-guard）
     component_match str   — 比對元件 type 的 regex（命中 → 觸發）
     severity        str   — "error" | "warning"
     issue           str   — 簡短問題（顯示給學生）
@@ -26,6 +27,12 @@ CAPABILITY_RULES: list[dict[str, Any]] = [
         "intent_patterns": [
             r"輪", r"wheel", r"drive", r"連續轉", r"一直轉",
             r"行走", r"move", r"前進", r"後退", r"走路", r"locomotion",
+        ],
+        # negative-guard(2026-06-13):伺服做「關節角度控制」的足式步行(雙足/四足/人形)
+        # 是伺服正確用途,非驅動輪;排除以免 CAP-001 對 servo-walker 偽陽性 error。見 feasibility.py _check_capability。
+        "exclude_patterns": [
+            r"雙足", r"biped", r"步行", r"walker", r"otto", r"腿", r"leg",
+            r"關節", r"joint", r"humanoid", r"人形", r"四足", r"quadruped",
         ],
         "component_match": r"^Motor-Servo",
         "severity": "error",

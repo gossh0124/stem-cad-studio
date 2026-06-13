@@ -4,7 +4,7 @@
   V1  pipeline 流程順序 + bridge_store 契約
   V2  電氣規劃邏輯閉合 + 失敗時 gate 觸發
   V3  Schematic 涵蓋全部非 Brain/Power 元件
-  V5.1 IO 孔位精度（REGISTRY pin 抽樣 vs datasheet）
+  V5.1 IO 孔位精度（REGISTRY port bbox sanity + Servo pitch/Arduino holes datasheet 檢查;非全 class datasheet 位置比對）
   V6  測試代碼存在性（scripts/ 下檔案 + AST）
 
 執行：
@@ -69,6 +69,7 @@ def _run_p2_then_p3(components: list, project_name: str = "v_test") -> dict:
     import tempfile
     import uuid
     tmpdir = Path(tempfile.mkdtemp(prefix='v_p23_'))
+    original_proj_dir = bs.project_output_dir
     bs.project_output_dir = lambda job: str(tmpdir)
 
     bridge = {
@@ -90,6 +91,8 @@ def _run_p2_then_p3(components: list, project_name: str = "v_test") -> dict:
         return bridge
     except Exception as exc:
         return {"_error": str(exc), "_traceback": __import__("traceback").format_exc()}
+    finally:
+        bs.project_output_dir = original_proj_dir
 
 
 def verify_v2() -> dict:
@@ -196,10 +199,16 @@ def verify_v51() -> dict:
       - Servo: 仍維持 GND/VCC/SIGNAL 3 pin（測 pin pitch 2.54mm ± 0.5mm）
       - Arduino: ports 為 USB/DC-Jack 等對外接口，mounting_holes 來自 lib/pcb（三來源交叉驗證）
 
-    驗收：
-      - 每元件至少 1 個 port，所有 port (x, y) 落在 board 範圍 [0, length_mm] × [0, width_mm]
-      - Servo GND/VCC/SIGNAL pin 間距 2.54 ± 0.5 mm
-      - Arduino mounting_holes 數量 = 4
+    驗收（注意各子測的實際強度）：
+      - bbox sanity：每元件至少 1 個 port，且所有 port (x, y) 落在 board 範圍
+        [0, length_mm+0.5] × [0, width_mm+0.5]。**這只是 out-of-board sanity
+        check,不是 datasheet 位置比對**——port 雖偏移但仍落在外框內者會 pass。
+      - Servo GND/VCC/SIGNAL pin 間距 2.54 ± 0.5 mm（唯一 datasheet 接地的精度檢查）
+      - Arduino mounting_holes 數量 = 4（datasheet 接地）
+
+    TODO(datasheet): 若需真正的「孔位精度」需把指定 class 的特定 port 座標與
+    datasheet 已知值逐一比對;目前缺該硬編碼基準資料,故只做 bbox sanity,
+    勿誤把 bbox pass 當成 datasheet 位置正確。
     """
     from lib.registry import COMPONENT_REGISTRY
 

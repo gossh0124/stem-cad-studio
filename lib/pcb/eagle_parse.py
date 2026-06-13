@@ -55,10 +55,13 @@ def _parse_rot(rot: Optional[str]) -> Tuple[int, bool]:
         return 0, False
     mirror = rot.startswith("M")
     digits = rot.lstrip("MR")
+    if not digits:
+        return 0, mirror
     try:
-        angle = int(round(float(digits))) % 360 if digits else 0
-    except ValueError:
-        angle = 0
+        angle = int(round(float(digits))) % 360
+    except ValueError as exc:
+        # 嚴格無容錯：garbled rot 不可降級成 R0（會產生看似合理卻錯誤的擺放）
+        raise ValueError(f"無法解析 EAGLE rot 屬性 {rot!r}（digits={digits!r}）") from exc
     return angle, mirror
 
 
@@ -118,11 +121,15 @@ def _bbox_from_pads(pkg: ET.Element) -> Optional[Tuple[float, float, float, floa
     ys: List[float] = []
     for el in pkg:
         if el.tag == "pad":
+            if None in (el.get("x"), el.get("y")):
+                continue
             x, y = float(el.get("x")), float(el.get("y"))
             d = float(el.get("diameter", "0") or 0) / 2 or 0.6
             xs += [x - d, x + d]
             ys += [y - d, y + d]
         elif el.tag == "smd":
+            if None in (el.get("x"), el.get("y")):
+                continue
             x, y = float(el.get("x")), float(el.get("y"))
             dx = float(el.get("dx", "0")) / 2
             dy = float(el.get("dy", "0")) / 2

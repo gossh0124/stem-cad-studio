@@ -30,6 +30,11 @@ from .validate import (  # noqa: F401
     resolve_wiring_pin_level,
     ssot_pin_info,
 )
+from .power_inject import (  # noqa: F401
+    PowerInjectError, UnknownPowerSourceError,
+    derive_power_injection, derive_load_power_injection,
+)
+from .netlist import build_netlist  # noqa: F401
 
 __all__ = [
     # constants
@@ -45,4 +50,9 @@ __all__ = [
     "generate_wiring_notes",
     # validate
     "WiringIssue", "validate_wiring", "resolve_wiring_pin_level", "ssot_pin_info",
+    # power_inject (S-power-inject)
+    "PowerInjectError", "UnknownPowerSourceError",
+    "derive_power_injection", "derive_load_power_injection",
+    # netlist (S-netlist)
+    "build_netlist",
 ]

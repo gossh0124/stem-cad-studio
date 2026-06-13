@@ -5,6 +5,7 @@ Checks all 4 PCB specs for SubComponent thermal resistance data:
   - rth_sources has 3 entries (3-source cross-verification)
   - S1 vs S2 deviation < 30%
   - S1 vs S3 deviation < 30%
+  - S2 vs S3 deviation < 30%
 
 Usage:
     .venv/Scripts/python.exe scripts/audit_rth_ja.py
@@ -100,11 +101,19 @@ def audit_board(board_name: str, pcb_spec, strict: bool) -> tuple:
 
         if src_count >= 3:
             v1 = srcs[0]['value']
+            v2 = srcs[1]['value']
             v3 = srcs[2]['value']
             dev13 = _deviation_pct(v1, v3)
             dev13_str = f'{dev13:.1f}%'
             if dev13 > MAX_DEVIATION_PCT:
                 status_parts.append(f'FAIL:S1-S3={dev13:.1f}%>{MAX_DEVIATION_PCT}%')
+                row_fail = True
+            # Check 5: S2 vs S3 deviation < 30% -- guards against two
+            # opposite-side outliers passing both pairwise-with-S1 checks
+            # while diverging from each other (false PASS otherwise).
+            dev23 = _deviation_pct(v2, v3)
+            if dev23 > MAX_DEVIATION_PCT:
+                status_parts.append(f'FAIL:S2-S3={dev23:.1f}%>{MAX_DEVIATION_PCT}%')
                 row_fail = True
 
         if row_fail:

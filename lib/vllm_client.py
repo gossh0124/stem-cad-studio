@@ -78,8 +78,15 @@ def is_vllm_available() -> bool:
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             return resp.status == 200
-    except Exception:
+    except urllib.error.HTTPError as e:
+        # server 有回應但非 2xx（如 503 載入中）→ 視為尚未就緒，但記錄以利診斷
+        _log.warning("[vLLM] /health 回傳 HTTP %s（%s）→ 視為未就緒", e.code, VLLM_BASE_URL)
         return False
+    except urllib.error.URLError as e:
+        # 連線/逾時/DNS 等網路層失敗 → 不可用，但記錄以區分「設定錯誤」與「刻意關閉」
+        _log.warning("[vLLM] /health 連線失敗 (%s): %s → 視為不可用", VLLM_BASE_URL, e)
+        return False
+    # 其餘非預期例外（如 request 建構 bug）不吞，讓設定錯誤浮現
 
 
 def vllm_generate(

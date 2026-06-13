@@ -414,14 +414,19 @@ class TestComputeTwoPieceSpec:
         assert spec.lid_cutout_count == 3
 
     def test_side_cutout_count_only_left(self):
-        """side_cutout_count counts only protrudes='left' with profile."""
+        """side_cutout_count counts every protruding side with a profile.
+
+        This must match the geometry actually produced by _apply_side_cutouts,
+        which cuts openings on left/right/top/bottom (not just 'left'). A
+        component with no protrusion/profile is skipped.
+        """
         sub_left = MockSubComponent(name="USB", protrudes="left", profile="rect")
         sub_right = MockSubComponent(name="DC", protrudes="right", profile="circle")
         sub_none = MockSubComponent(name="IC", protrudes="", profile="")
         pcb = _make_pcb_spec(sub_components=(sub_left, sub_right, sub_none))
         spec = compute_two_piece_spec(pcb)
-        # Only 'left' is counted in compute_two_piece_spec
-        assert spec.side_cutout_count == 1
+        # left + right are counted; the no-protrusion component is skipped.
+        assert spec.side_cutout_count == 2
 
     def test_snap_count_always_4(self):
         """compute_two_piece_spec always returns snap_count=4."""

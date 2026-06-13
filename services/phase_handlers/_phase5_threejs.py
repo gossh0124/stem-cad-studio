@@ -156,10 +156,16 @@ def _build_io_markers_js(bridge: dict) -> str:
         return ""
 
     spec = cad_out.get("spec", {})
-    inner_l = spec.get("inner_length", 120)
-    inner_w = spec.get("inner_width", 80)
+    _missing_io = [k for k in ("inner_length", "inner_width", "inner_height") if k not in spec]
+    if _missing_io:
+        raise ValueError(
+            f"_build_io_markers_js: cad_output.spec 缺少幾何尺寸 {_missing_io}，"
+            "無法計算 waypoint 世界座標，拒絕以假值頂替"
+        )
+    inner_l = spec["inner_length"]
+    inner_w = spec["inner_width"]
     wall = spec.get("wall", 2.0)
-    outer_h = spec.get("inner_height", 40) + 2 * wall
+    outer_h = spec["inner_height"] + 2 * wall
 
     placement_map = {p["type"]: p for p in placements}
 
@@ -202,25 +208,37 @@ def _build_component_boxes_js(bridge: dict, wall: float) -> str:
         return ""
 
     spec = cad_out.get("spec", {})
-    inner_l = spec.get("inner_length", 120)
-    inner_w = spec.get("inner_width", 80)
-    outer_h = spec.get("inner_height", 40) + 2 * wall
+    _missing_cb = [k for k in ("inner_length", "inner_width", "inner_height") if k not in spec]
+    if _missing_cb:
+        raise ValueError(
+            f"_build_component_boxes_js: cad_output.spec 缺少幾何尺寸 {_missing_cb}，"
+            "無法計算元件 box 定位座標，拒絕以假值頂替"
+        )
+    inner_l = spec["inner_length"]
+    inner_w = spec["inner_width"]
+    outer_h = spec["inner_height"] + 2 * wall
 
-    _ROLE_COLORS = {
-        "Brain": "0x4da6ff", "Power": "0xffaa44", "Sensor": "0x44cc88",
-        "Output": "0xff6688", "Control": "0xcc88ff", "Actuator": "0xff6688",
-        "Display": "0xaadd44", "Lighting": "0xffee44", "Motor": "0xff8844",
-        "Sound": "0xdd88ff", "Audio": "0xdd88ff", "Mist": "0x88ddff",
-    }
+    # Wave B: 衍生自 lib/config.ROLE_PALETTE 單一 SSOT（#RRGGBB → Three.js 0xRRGGBB）;
+    # 補向後相容別名（Output/Motor→Actuator、Audio→Sound）。
+    from lib.config import ROLE_PALETTE
+    _ROLE_COLORS = {r: "0x" + c.lstrip("#") for r, c in ROLE_PALETTE.items()}
+    _ROLE_COLORS.update({
+        "Output": _ROLE_COLORS["Actuator"], "Motor": _ROLE_COLORS["Actuator"],
+        "Audio": _ROLE_COLORS["Sound"],
+    })
     lines: List[str] = []
     for p in placements:
-        cL = p.get("L", 30)
-        cW = p.get("W", 20)
-        cH = p.get("H", 10)
-        if "x" not in p:
-            raise ValueError(f"placement missing required 'x' coordinate: {p!r}")
+        for _req in ("L", "W", "H", "x", "y"):
+            if _req not in p:
+                raise ValueError(
+                    f"_build_component_boxes_js: placement 缺少必要鍵 {_req!r}，"
+                    f"拒絕以假值頂替（30/20/10/0）: {p!r}"
+                )
+        cL = p["L"]
+        cW = p["W"]
+        cH = p["H"]
         cx_cq = p["x"] + cL / 2 - inner_l / 2
-        cy_cq = p.get("y", 0) + cW / 2 - inner_w / 2
+        cy_cq = p["y"] + cW / 2 - inner_w / 2
         cz_cq = -outer_h / 2 + wall + cH / 2
         tx, ty, tz = cx_cq, cz_cq, -cy_cq
         color = _ROLE_COLORS.get(p.get("role", ""), "0x888888")

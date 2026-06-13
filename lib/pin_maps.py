@@ -57,3 +57,43 @@ _PIN_MAPS: dict[str, dict] = {
         "spi":     {"mosi": 15, "miso": 14, "sck": 13},
     },
 }
+
+
+# ── MCU pin label convention (SSOT for engine.py / csp.py / validate.py) ──────
+# The frontend whitelist (v6/config/mcu-ports.js) labels numeric pins per-MCU:
+#   Arduino digital → Dxx (its analog/I2C pins are already named A0/A4);
+#   ESP32 all → Dxx;  Microbit → Pxx;  RPi → GPxx.
+# The prefix applies ONLY to bare-integer pins — named pins (A4, A0) pass through
+# unchanged. The old rule (`"" if type=="analog" else "D"`) mis-prefixed Arduino
+# I2C "A4" → "DA4" and mis-skipped ESP32 analog 32 → "32"; both were then dropped
+# by the frontend whitelist (UND-S2). One function so the wiring engine, the CSP
+# allocator and the validator all agree (to_json enrichment matches by label).
+_MCU_PIN_PREFIX: dict[str, str] = {"Microbit": "P", "RPi": "GP"}
+
+
+def mcu_pin_prefix(brain_key: str) -> str:
+    """Per-MCU numeric-pin prefix matching the frontend MCU_PORTS whitelist."""
+    return _MCU_PIN_PREFIX.get(brain_key, "D")
+
+
+def label_mcu_pin(brain_key: str, raw_pin: object) -> str:
+    """Canonical MCU pin label. Prefix applies to bare-integer pins only;
+    named pins (A4 / A0 / GPIOxx) pass through unchanged."""
+    s = str(raw_pin)
+    return f"{mcu_pin_prefix(brain_key)}{s}" if s.isdigit() else s
+
+
+def mcu_power_pin(brain_key: str, vcc_voltage: object) -> str:
+    """Map a component's nominal VCC ('3.3V' / '5V') to the MCU power-rail pin
+    label the frontend whitelist uses ('3V3'/'5V'; Microbit's 3.3V rail is '3V').
+
+    A component template carries a voltage string, NOT a whitelist pin name, so
+    'mcu' = '3.3V' was silently dropped by the schematic whitelist (UND-S2). A 5V
+    load on Microbit (which has no 5V rail) keeps '5V' so it surfaces as a
+    power-feasibility error rather than masquerading as the 3V rail."""
+    v = str(vcc_voltage).strip().upper().replace("3.3V", "3V3").replace("3.3", "3V3")
+    if v in ("3V3", "3V"):
+        return "3V" if brain_key == "Microbit" else "3V3"
+    if v in ("5V", "5"):
+        return "5V"
+    return str(vcc_voltage)  # already a canonical rail name (e.g. 'VIN')

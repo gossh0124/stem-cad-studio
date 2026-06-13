@@ -149,7 +149,7 @@ def _rag_index_case(job_id: str, bridge: dict):
     except ImportError:
         pass
     except Exception as exc:
-        _log.debug("[BridgeStore] RAG 索引跳過: %s", exc)
+        _log.warning("[BridgeStore] RAG 索引失敗 (job_id=%s): %s", job_id, exc)
 
 
 def load_bridge(job_id: str) -> Optional[dict]:
@@ -373,8 +373,8 @@ class DecisionTrail:
             with self._lock:
                 with open(self._path(job_id), "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except OSError:
-            pass
+        except OSError as exc:
+            _log.warning("[DecisionTrail] 寫入失敗 (job_id=%s): %s", job_id, exc)
 
     def read(self, job_id: str) -> list[dict]:
         p = self._path(job_id)

@@ -16,9 +16,20 @@ _BRD = os.path.join(
     os.path.dirname(__file__), "..",
     "data", "pcb_sources", "arduino_uno_r3", "eagle_official", "UNO-TH_Rev3e.brd")
 
+# .brd 為 machine-local（data/pcb_sources gitignored，決策 B 2026-06-07）。檔不在時
+# （fresh clone / CI）依賴 .brd 的解析測試「大聲」skip 而非 error — skip reason 標明還原步驟。
+_brd_required = pytest.mark.skipif(
+    not os.path.exists(_BRD),
+    reason=("UNO-TH_Rev3e.brd 不在（data/pcb_sources gitignored）。"
+            "還原：從 V2 archive Copy-Item data/pcb_sources/arduino_uno_r3/"
+            "eagle_official/UNO-TH_Rev3e.brd。見「開放問題待辦索引」。"),
+)
+
 
 @pytest.fixture(scope="module")
 def elems():
+    if not os.path.exists(_BRD):
+        pytest.skip("UNO-TH_Rev3e.brd 不在（data/pcb_sources gitignored）")
     return parse_brd(_BRD)
 
 
@@ -63,6 +74,7 @@ class TestApplyTransform:
 
 
 # ── 整檔解析 ─────────────────────────────────────────────────
+@_brd_required
 class TestParseBrd:
     def test_returns_many_elements(self, elems):
         assert len(elems) > 100  # UNO-TH 有上百個 element

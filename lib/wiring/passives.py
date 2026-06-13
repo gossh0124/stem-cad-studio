@@ -9,6 +9,9 @@
 location 判定 = 拓撲預設 + on_board_components 覆寫（權威，符合「權威來源優先」）。
 被動仍維持「繪製層標註/徽章」（不切 ELK 走線）；本層只加資料欄位。
 設計見 .ai/_phase2_design.md（B-1：不建 R/C/D class，用 on_board_components 當板載真相）。
+
+P3.2/G3（active refdes）：同層另提供 `annotate_active_refdes`，為 active 元件(MCU + 周邊)
+依 IEEE 315 慣例給確定性 refdes(U/K/M/BT/DS/LS/SW),序入 to_json(見檔尾)。
 """
 from __future__ import annotations
 
@@ -116,3 +119,64 @@ def annotate_passives(
             _annotate(cap, comp_short)
     for pp in power_passives:
         _annotate(pp, None, power_net=pp.get("net"))
+
+
+# ── Active 元件 refdes(P3.2/G3:active 元件升 netlist 一等公民)─────────────
+# 被動已有 R/C/D refdes(上方);active 元件(MCU + wiring 內周邊)先前只以 compKey
+# (如 "Relay"/"OLED")標示,無確定性 refdes。此處比照被動的「型別前綴 + 計數」模式,
+# 依 IEEE 315 慣例給 active 元件 refdes,序入 to_json。前綴 by SSOT class(權威),
+# 預設 U(IC/模組:MCU/OLED/LCD/感測模組/MSGEQ7)。
+# 前綴 by **真實 SSOT class**(經 SHORT_TO_CLASS,非 short+"-class" 偽名,以免 OLED 含「LED」
+# 子字串被誤判)。"Lighting" 已涵蓋全部真 LED(Lighting-LED-*/NeoPixel)且不誤捕 Display-OLED;
+# module(MCU/OLED/LCD/MP3/感測模組/MSGEQ7)一律預設 U。
+_ACTIVE_REFDES_PREFIX_RULES: list[tuple[str, str]] = [
+    ("Relay", "K"),                            # 繼電器
+    ("Motor", "M"), ("Pump", "M"),             # 馬達 / 泵
+    ("Battery", "BT"),                         # 電池
+    ("Lighting", "DS"),                        # Lighting-LED-* / NeoPixel(LED/display）
+    ("Buzzer", "LS"),                          # 蜂鳴器（sounder）
+    ("Switch", "SW"), ("Button", "SW"),        # 開關 / 按鈕
+]
+
+
+def _active_prefix(class_name: str) -> str:
+    """真實 SSOT class → refdes 前綴(IEEE 315 慣例);無匹配 → U(IC/模組)。"""
+    for kw, pfx in _ACTIVE_REFDES_PREFIX_RULES:
+        if kw in (class_name or ""):
+            return pfx
+    return "U"
+
+
+def annotate_active_refdes(
+    wiring: dict,
+    *,
+    brain_short: str | None = None,
+) -> dict[str, str]:
+    """為 active 元件補確定性 refdes(型別前綴 + 計數),回 {comp_short: refdes}。
+
+    - MCU(brain_short)依慣例取 U1(先消耗 U 計數);
+    - wiring dict 周邊元件依**插入序**(= 正規化 comps 序,確定性)給型別前綴 refdes;
+    - 前綴由 **SHORT_TO_CLASS 解析的真實 SSOT class** 決定(comp_class_map 為 leaf,無循環);
+    - in-place 設 wiring[comp]['refdes'](供 render badge 比照被動顯示)。
+    同輸入必得同 refdes(determinism);不變更 net node 的 ref(隔離契約按 comp_short 比對,
+    避免破壞),refdes 以本 map / wiring 欄位提供查詢。
+    """
+    from .comp_class_map import SHORT_TO_CLASS  # leaf module, no circular import
+    counters: dict[str, int] = {}
+    refmap: dict[str, str] = {}
+
+    def _assign(key: str) -> str:
+        pfx = _active_prefix(SHORT_TO_CLASS.get(key, ""))
+        counters[pfx] = counters.get(pfx, 0) + 1
+        rd = f"{pfx}{counters[pfx]}"
+        refmap[key] = rd
+        return rd
+
+    # MCU 慣例 U1(先消耗,使周邊 U-prefix 從 U2 起)
+    if brain_short:
+        _assign(brain_short)
+    for comp_short, info in wiring.items():
+        rd = _assign(comp_short)
+        if isinstance(info, dict):
+            info["refdes"] = rd
+    return refmap

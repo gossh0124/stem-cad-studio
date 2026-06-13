@@ -1,0 +1,8 @@
+{
+  "name": "schematic-geometry-tests",
+  "private": true,
+  "description": "P0.1 headless ELK 幾何斷言 harness（DEC-H1：取代 Chrome F5 目視）",
+  "type": "commonjs",
+  "scripts": { "test": "node --test" },
+  "dependencies": { "elkjs": "^0.11.0" }
+}

@@ -20,6 +20,7 @@ from lib.assembly_solver.enclosure_fit import (
     pack_compact, place_buckets, compute_wall_holes, panel_cutouts,
     PACKED_RELATIONS, FACE_RELATIONS, WALL_CROSSING_RELATIONS,
 )
+from lib.assembly_solver.thermal_rc import ic_thermal_for
 
 _log = logging.getLogger("cadhllm.assembly_solver_v3")
 
@@ -450,6 +451,7 @@ def solve_v3(components: List[dict], wiring_raw: dict, enclosure_spec: dict) -> 
             "enclosure_relation":m.enclosure_relation,
             "meshes":[{"variant":mr.variant,"url":mr.url,"format":mr.format} for mr in m.meshes],
             "shell_ports":sp_list, "thermal_mw":m.thermal_mw,
+            "ic_thermal": ic_thermal_for(m.comp_type),  # A5.1: per-IC junction temps (ADR-10 RC)
         }
         if getattr(m, "host_structure", None) is not None:
             entry["host_structure"] = m.host_structure

@@ -246,7 +246,7 @@ CANNED_PROFILES = [
     ("Arduino", ["LED_RGB", "Button"]),                                 # rgb_lamp
     ("Arduino", ["TempHumid", "OLED", "Button"]),                      # temp_display
     ("Arduino", ["Ultrasonic", "NeoPixel"]),                           # distance_light
-    ("Arduino", ["DCMotor", "Ultrasonic", "Button"]),                  # obstacle_car
+    ("Arduino", ["DCMotor", "Ultrasonic", "Button"]),                  # motor+sensor+button mix
     ("Arduino", ["Stepper", "PIR"]),                                    # auto_curtain
     ("Arduino", ["Buzzer_Active", "PIR"]),                              # alarm
     ("Arduino", ["LCD", "TempHumid"]),                                  # lcd_weather
@@ -295,3 +295,50 @@ class TestBackwardCompatibility:
                         pin = alloc.get(comp, {}).get(need.tag)
                         assert pin not in input_only, (
                             f"[ESP32] {comp}.{need.tag}={pin} on input-only GPIO")
+
+
+# ── 9. Global pin-budget feasibility (anti-hang regression) ──────────────
+# 2026-06-11: csp_allocate 缺全域腳位預算預檢時,過訂(鴿籠不可行)設計會讓
+# _backtrack 窮舉指數樹「永不終止」(實測 >5,000,000 節點/47s 未返)。此組鎖:
+# (a) 4b 匹配預檢秒拒鴿籠不可行集;(b) 任何輸入必有界終止(節點上限承重)。
+
+class TestGlobalPinBudget:
+    # 根因集:13 個 digital/pwm 唯一需求 > Arduino UNO 12 腳(鴿籠不可行)。
+    _OVERBUDGET_ARDUINO = [
+        "Relay", "Pump", "Servo", "Stepper", "OLED", "LED_Single",
+        "Buzzer_Active", "Button", "Switch", "SoilMoisture", "DCMotor",
+    ]
+
+    def test_pigeonhole_overbudget_fast_conflict(self):
+        """過訂集必在預檢層快速回 conflict(修前 = 無窮回溯 hang)。"""
+        import time
+        t0 = time.monotonic()
+        _, _, conflicts = _run_csp("Arduino", self._OVERBUDGET_ARDUINO)
+        elapsed = time.monotonic() - t0
+        assert conflicts, "13 digital/pwm 需求 > 12 腳,必須回 conflict"
+        assert elapsed < 10, f"預檢應毫秒級完成,實測 {elapsed:.1f}s(hang 回歸)"
+        joined = " ".join(conflicts)
+        assert "Not enough unique pins" in joined, conflicts
+        # 訊息報「飽和群組」真值:13 needed / 12 available,不混入 analog 池
+        assert "13 pins needed" in joined and "12 available" in joined, conflicts
+
+    def test_overbudget_raises_pin_allocation_error(self):
+        """allocate_pins 對過訂集必 raise(no-silent-fallback,不降級 FIFO)。"""
+        from lib.wiring import PinAllocationError
+        with pytest.raises(PinAllocationError):
+            allocate_pins("Arduino", self._OVERBUDGET_ARDUINO)
+
+    def test_matching_blind_spot_terminates(self):
+        """匹配預檢盲區(I2C 共享腳逐出互動)仍須有界終止 — 節點上限承重。
+
+        此 ESP32 集可穿過 4b 匹配(看不見 _forward_check 的 I2C 逐出)但實際
+        不可行:無上限時 >2,000,000 節點/16.7s 不返。不斷言可行性結論(未來
+        COMP_PIN_NEEDS 變動可能翻轉),只斷言「必須終止」這個反 hang 不變量。
+        """
+        import time
+        comps = ["DCMotor", "PIR", "Buzzer_Passive", "LED_RGB",
+                 "OLED", "SD_Card", "MSGEQ7", "Stepper"]
+        t0 = time.monotonic()
+        _run_csp("ESP32", comps)   # 可行→回 allocation;不可行→回 conflicts
+        elapsed = time.monotonic() - t0
+        assert elapsed < 30, f"csp_allocate 必須有界終止,實測 {elapsed:.1f}s"

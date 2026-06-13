@@ -77,6 +77,19 @@ def _port_aabb(port: dict, comp_l: float, comp_w: float) -> Optional[Tuple[float
             hw, hd = bw / 2, bd / 2
             return (cx - hw, cy - hd, cx + hw, cy + hd)
 
+    # AV3-7: pin-headers use pins/pitch/rows (no bodyW/bodyD) → branches above return
+    # None and the overlap gate is blind to them. Derive housing AABB from the pin grid.
+    if shape.startswith("conn-header") and not (bw > 0 and bd > 0):
+        pins = params.get("pins")
+        if pins:
+            pitch = params.get("pitch", 2.54)
+            rows = max(1, int(params.get("rows", 1)))
+            lng = max(1, int(pins) // rows) * pitch  # along pin-run axis
+            sht = rows * pitch                       # across rows
+            vert = str(port.get("orientation") or params.get("orientation") or "h").startswith("v")
+            hw, hd = (sht / 2, lng / 2) if vert else (lng / 2, sht / 2)
+            return (cx - hw, cy - hd, cx + hw, cy + hd)
+
     if bw > 0:
         hw = bw / 2
         hd = (bd if bd > 0 else bw) / 2
@@ -119,11 +132,20 @@ def _is_stacking_pair(pa: dict, pb: dict) -> bool:
     return False
 
 
+def _is_overstated_footprint(port: dict) -> bool:
+    """AV3-7: True if the port AABB is a housing/keep-out box (pin-header housing or
+    mounting-hole pad ring) that overstates copper extent. On dense boards these
+    legitimately border neighbours, so an overlap involving one is a review-adjacency."""
+    shape = port.get("shape", "")
+    return shape.startswith("conn-") or shape == "mounting-hole"
+
+
 def validate_ic_port_overlap(component_dims: dict) -> List[ValidationIssue]:
     """Check IC/connector ports within each component entry for AABB overlap.
 
-    Only compares ports on the SAME side. Excludes intentional 3D stacking
-    patterns (dome over IC, heatsink on chip, housing enclosing subcomponents).
+    Only compares ports on the SAME side. Excludes intentional 3D stacking patterns.
+    Overlaps involving a header housing / mounting-hole pad ring → warning (AABB
+    overstates copper); IC-vs-IC collisions → error (AV3-7: headers were blind before).
     """
     issues: List[ValidationIssue] = []
     for comp_type, spec in component_dims.items():
@@ -145,13 +167,16 @@ def validate_ic_port_overlap(component_dims: dict) -> List[ValidationIssue]:
                     continue
                 area = _aabb_overlap_area(aabbs[i][2], aabbs[j][2])
                 if area > 0.5:
+                    overstated = _is_overstated_footprint(aabbs[i][3]) or _is_overstated_footprint(aabbs[j][3])
                     issues.append(ValidationIssue(
                         check="ic_port_overlap",
-                        severity="error",
+                        severity="warning" if overstated else "error",
                         component=comp_type,
-                        message=f"{aabbs[i][0]} & {aabbs[j][0]} overlap {area:.1f}mm2",
+                        message=f"{aabbs[i][0]} & {aabbs[j][0]} overlap {area:.1f}mm2"
+                                + (" (header/hole footprint — review)" if overstated else ""),
                         details={"port_a": aabbs[i][0], "port_b": aabbs[j][0],
-                                 "overlap_mm2": round(area, 2)},
+                                 "overlap_mm2": round(area, 2),
+                                 "overstated_footprint": overstated},
                     ))
     return issues
 
@@ -422,6 +447,12 @@ def validate_assembly(scene_graph: dict) -> ValidationResult:
     holes = enclosure.get("holes", [])
     modules = scene_graph.get("modules", [])
     wires = scene_graph.get("wires", [])
+    # AV3-7: component_dims / datasheet must be plumbed through the scene graph so the
+    # IC port-overlap and datasheet-proportion gates actually run in production. When
+    # absent we skip those two checks (no silent green for them — they are not counted
+    # as run), but we never fabricate dims/datasheet values.
+    component_dims = scene_graph.get("component_dims", {})
+    datasheet = scene_graph.get("datasheet")
 
     checks_run += 1
     mod_issues = validate_module_overlap_3d(modules)
@@ -443,10 +474,24 @@ def validate_assembly(scene_graph: dict) -> ValidationResult:
     clearance_issues = validate_panel_internal_clearance(modules, inner)
     issues.extend(clearance_issues)
 
+    # AV3-7: IC port-overlap (IC-vs-IC copper collision) + datasheet-proportion gate.
+    # Only run when component_dims is actually present so we never validate fabricated
+    # data; when present these are real, counted checks folded into passed=.
+    counted_groups = [mod_issues, wire_issues, hole_issues,
+                      panel_issues, clearance_issues]
+    if component_dims:
+        checks_run += 1
+        port_issues = validate_ic_port_overlap(component_dims)
+        issues.extend(port_issues)
+        counted_groups.append(port_issues)
+
+        checks_run += 1
+        prop_issues = validate_proportions(component_dims, datasheet)
+        issues.extend(prop_issues)
+        counted_groups.append(prop_issues)
+
     errors = [i for i in issues if i.severity == "error"]
-    checks_passed = checks_run - sum(
-        1 for grp in (mod_issues, wire_issues, hole_issues,
-                       panel_issues, clearance_issues) if grp)
+    checks_passed = checks_run - sum(1 for grp in counted_groups if grp)
 
     return ValidationResult(
         passed=len(errors) == 0,

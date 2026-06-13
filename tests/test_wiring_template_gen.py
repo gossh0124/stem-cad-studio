@@ -10,6 +10,7 @@ from lib.wiring.template_gen import (
     _COMP_OVERRIDES,
     _DS_TO_SHORT,
     _SHORT_TO_DS,
+    _POWER_SOURCE_CLASSES,
     template_from_datasheet,
     generate_all_templates,
     get_template,
@@ -96,9 +97,11 @@ class TestApplyOverride:
         assert result is tmpl
 
     def test_override_replaces_fields(self):
+        # S-wiring SSOT-derive retired Servo's override (now SSOT-derived); use a
+        # KEPT genuine exception (DCMotor) to verify _apply_override replaces fields.
         tmpl = WiringTemplate(label="Original", vcc="3.3V", extra=[], decoupling=None)
-        result = _apply_override("Servo", tmpl)
-        assert result.label == "SG90 伺服馬達"
+        result = _apply_override("DCMotor", tmpl)
+        assert result.label == "L298N 馬達驅動"
         assert result.vcc == "5V"
         assert len(result.extra) > 0
 
@@ -129,6 +132,29 @@ class TestTemplateFromDatasheet:
 
     def test_unknown_returns_none(self):
         assert template_from_datasheet("CompletelyFakeComponent999") is None
+
+    def test_power_source_classes_nonempty(self):
+        # A4-A: frozenset must contain the five power source keys
+        assert len(_POWER_SOURCE_CLASSES) == 5
+        assert "Battery-AA-class" in _POWER_SOURCE_CLASSES
+        assert "USB-5V-class" in _POWER_SOURCE_CLASSES
+
+    def test_power_source_raises_value_error(self, monkeypatch):
+        # A4-A: passing a power-source ds_key directly must fail-loud
+        fake_ds = {
+            "Battery-AA-class": {
+                "identity": {"full_name": "AA Battery"},
+                "pin_layout": {"header_groups": [
+                    {"pins": [{"name": "V+", "type": "PWR", "voltage_domain": "1.5V",
+                                "direction": "power"}]}
+                ]},
+                "wiring_hints": {},
+            }
+        }
+        import lib.wiring.template_gen as tg
+        monkeypatch.setattr(tg, "_datasheet_cache", fake_ds)
+        with pytest.raises(ValueError, match="power source"):
+            template_from_datasheet("Battery-AA-class")
 
 
 class TestGenerateAllTemplates:

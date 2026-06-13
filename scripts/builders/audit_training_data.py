@@ -5,8 +5,8 @@ try:
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except (AttributeError, OSError):
     pass
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "training"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "training"))
 
 from collections import Counter, defaultdict
 

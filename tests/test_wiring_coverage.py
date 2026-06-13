@@ -29,7 +29,7 @@ NON_WIRED_ALLOWLIST = {
     # Brain / MCU 本體 —— 是接線的主體，非外設
     "Arduino-Uno", "Arduino-Nano", "ESP32", "ESP8266", "RPi", "RaspberryPi", "Microbit",
     # 電源 —— 供電非信號
-    "Battery-AA", "Battery-LiPo", "USB-5V", "AC-Adapter",
+    "Battery-AA", "Battery-4AA", "Battery-LiPo", "USB-5V", "AC-Adapter",
     # 結構件 —— 無電氣腳
     "Chassis-Car",
     # 繼電器/驅動間接控制 —— 無直接 MCU 信號腳（Pump 由 Relay 控制供電）

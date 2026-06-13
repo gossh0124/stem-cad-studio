@@ -311,34 +311,42 @@ def check_wiring(
             _log(progress_cb, f"  ⚠️  {msg}")
 
     # EW8: Pin direction compatibility check
+    # The optional lib.wiring import may be unavailable -> skip EW8 (ImportError only).
+    # All other failures (no-Brain guard, validation errors) must NOT fail open:
+    # they set ok=False so the gate stays honest instead of silently going green.
     try:
         from lib.wiring import normalize_brain, normalize_comp
         from lib.wiring.validate import validate_wiring
+    except ImportError as e:
+        _log(progress_cb, f"  (EW8 skipped, lib.wiring unavailable: {e})")
+    else:
         brain_type = next((c.get("type", "") for c in components
                            if c.get("role") == "Brain"), None)
         if not brain_type:
-            raise ValueError(
-                "找不到 Brain 元件，無法對真實 MCU 做 EW8 接線方向檢查"
-                "（拒絕以預設 Arduino-Uno 估算，避免對使用者顯示假接線警告）"
-            )
-        brain_key = normalize_brain(brain_type)
-        comp_shorts = [normalize_comp(c.get("type", ""))
-                       for c in components
-                       if c.get("role") not in ("Brain", "Power")]
-        issues = validate_wiring(brain_key, comp_shorts)
-        for issue in issues:
-            rec = issue.to_dict() if hasattr(issue, "to_dict") else issue
-            lvl = "ERROR" if rec.get("severity") == "error" else "WARN"
-            msg = (f"EW8: {rec['comp']}.{rec['comp_pin']}({rec['comp_direction']}) "
-                   f"↔ {rec['mcu_pin']}({rec['mcu_direction']}): {rec['reason']}")
-            results.append({"level": lvl, "rule": "EW8", "msg": msg})
-            if lvl == "ERROR":
-                ok = False
-                _log(progress_cb, f"  ❌ {msg}")
-            else:
-                _log(progress_cb, f"  ⚠️  {msg}")
-    except Exception as e:  # noqa: BLE001 -- fail-open
-        _log(progress_cb, f"  (EW8 skipped: {e})")
+            # Deliberate guard: refuse to estimate with a default MCU. This must
+            # surface as a hard failure, not be swallowed by a fail-open except.
+            msg = ("找不到 Brain 元件，無法對真實 MCU 做 EW8 接線方向檢查"
+                   "（拒絕以預設 Arduino-Uno 估算，避免對使用者顯示假接線警告）")
+            results.append({"level": "ERROR", "rule": "EW8", "msg": msg})
+            _log(progress_cb, f"  ❌ {msg}")
+            ok = False
+        else:
+            brain_key = normalize_brain(brain_type)
+            comp_shorts = [normalize_comp(c.get("type", ""))
+                           for c in components
+                           if c.get("role") not in ("Brain", "Power")]
+            issues = validate_wiring(brain_key, comp_shorts)
+            for issue in issues:
+                rec = issue.to_dict() if hasattr(issue, "to_dict") else issue
+                lvl = "ERROR" if rec.get("severity") == "error" else "WARN"
+                msg = (f"EW8: {rec['comp']}.{rec['comp_pin']}({rec['comp_direction']}) "
+                       f"↔ {rec['mcu_pin']}({rec['mcu_direction']}): {rec['reason']}")
+                results.append({"level": lvl, "rule": "EW8", "msg": msg})
+                if lvl == "ERROR":
+                    ok = False
+                    _log(progress_cb, f"  ❌ {msg}")
+                else:
+                    _log(progress_cb, f"  ⚠️  {msg}")
 
     results.append({"level": "OK", "rule": "Wiring", "msg": "基礎 Wiring 規則通過"})
     if ok:

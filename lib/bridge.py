@@ -30,11 +30,27 @@ def build_bom(components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 f"build_bom: component missing required 'selected_type' key (role={c.get('role', '?')!r})"
             )
         canonical = _resolve_alias(cls)
+        # 'unknown' 是 select_primary_type 的保留 sentinel（unresolved），
+        # 已在 unresolved_count 標記，不計價、不報錯。
+        # 其餘已解析的 canonical 若缺漏於價格 SSOT（specs.py），代表 SSOT drift，
+        # 不可靜默以 0 元計入 BOM —— 改為明確報錯，區分「免費」與「缺價」。
+        if canonical == "unknown":
+            price = 0
+            url = ""
+        else:
+            if canonical not in _PRICE_NTD:
+                raise KeyError(
+                    f"build_bom: resolved component class {cls!r} (canonical={canonical!r}) "
+                    f"is missing from price SSOT (lib/specs.py PRICE_NTD); "
+                    f"refusing to silently price it at 0 TWD"
+                )
+            price = _PRICE_NTD[canonical]
+            url = _BOM_URLS.get(canonical, "")
         bom.append({
             "class": cls,
             "role":  c.get("role", ""),
-            "price_twd": _PRICE_NTD.get(canonical, 0),
-            "url":       _BOM_URLS.get(canonical, ""),
+            "price_twd": price,
+            "url":       url,
         })
     return bom
 
@@ -114,10 +130,18 @@ def select_primary_type(candidates: list, p2_registry: set, inventory_mentions: 
         if resolved in p2_registry:
             reason = "alias_resolved" if cand != resolved else "direct_match"
             return resolved, reason, "resolved"
-    # 3. unresolved
+    # 3. unresolved — 'unknown' is a reserved contract sentinel; always log at warning
     fallback = candidates[0] if candidates else "unknown"
     if fallback == "unknown":
-        _log.warning("select_primary_type: no candidates, falling back to 'unknown'")
+        _log.warning(
+            "select_primary_type: no candidates supplied, falling back to sentinel 'unknown'"
+        )
+    else:
+        _log.warning(
+            "select_primary_type: no candidate resolved in p2_registry, "
+            "falling back to first candidate %r (status=unresolved)",
+            fallback,
+        )
     return fallback, "unresolved", "unresolved"
 
 

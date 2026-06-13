@@ -96,10 +96,12 @@ def audit_template(name: str, data: dict) -> dict:
         })
         return result
 
-    innerL = spec.get("inner_length", 0)
-    innerW = spec.get("inner_width", 0)
-    innerH = spec.get("inner_height", 0)
-    wall = spec.get("wall", 2.0)
+    # P6.3/no-silent-fallback(a):inner 尺寸餵出界/高度/面積 verdict,捏 0 會全面誤判
+    # FAIL(假幾何進判定)→ 直接索引,缺鍵 KeyError fail-loud。
+    innerL = spec["inner_length"]
+    innerW = spec["inner_width"]
+    innerH = spec["inner_height"]
+    wall = spec.get("wall", 2.0)  # nofallback-ok: 裝飾用，未參與任何幾何 check，dead assignment
 
     # Build AABB list
     rects_2d = []
@@ -207,10 +209,14 @@ def audit_template(name: str, data: dict) -> dict:
     has_glb = brain_type in GLB_BRAIN_TYPES
     result["checks"].append({
         "check": "glb_format",
-        "verdict": "PASS",
+        # WARN when no usable render shell can be confirmed (Brain missing or
+        # neither GLB nor STL), so a missing/unsupported render format is
+        # surfaced instead of always passing. STL is a supported format → PASS.
+        "verdict": "WARN" if brain_type == "unknown" else "PASS",
         "brain_type": brain_type,
         "detail": (f"{brain_type} uses GLB format (supported)"
-                   if has_glb else "STL format"),
+                   if has_glb else ("STL format" if brain_type != "unknown"
+                                    else "no Brain component / render shell unknown")),
     })
 
     # Check 8: Enclosure sizing sanity

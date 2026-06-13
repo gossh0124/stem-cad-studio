@@ -28,9 +28,15 @@ def auto_size_enclosure(bridge: dict, emit: Optional[Callable[[str], None]] = No
     try:
         from lib.registry import COMPONENT_REGISTRY
         registry = COMPONENT_REGISTRY
-    except ImportError:
-        _log.warning("lib.registry not available; using empty registry for sizing")
-        registry = {}
+    except ImportError as e:
+        # No-Silent-Fallback: COMPONENT_REGISTRY is the dimensional SSOT for
+        # enclosure sizing. Proceeding with an empty registry would size every
+        # enclosure from fabricated fallback footprints and return a
+        # confidently-wrong result. Hard-fail instead of mis-sizing silently.
+        raise RuntimeError(
+            "lib.registry (COMPONENT_REGISTRY) is unavailable; cannot size "
+            "enclosure without the dimensional SSOT"
+        ) from e
 
     total_area = 0.0
     max_dim = 0.0
@@ -47,6 +53,11 @@ def auto_size_enclosure(bridge: dict, emit: Optional[Callable[[str], None]] = No
             max_dim = max(max_dim, spec.length_mm, spec.width_mm)
             dims_found += 1
         else:
+            # Components without a registry footprint fall back to a
+            # conservative default footprint (40x25mm) so sizing degrades
+            # gracefully instead of crashing. The fallback contributes to
+            # total_area but is excluded from dims_found, so the rationale
+            # stays honest about which parts had real datasheet dimensions.
             total_area += (40 + padding) * (25 + padding) * comp.get("qty", 1)
 
     if max_dim > 100 or total_area > _AREA_MEDIUM:

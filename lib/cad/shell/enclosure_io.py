@@ -51,6 +51,18 @@ def _apply_side_cutouts(bd, pcb_spec, outer_l, outer_w, L, W, pcb_top_z,
                 cz_bot = cz - ch / 2
                 ch = new_top - cz_bot
                 cz = (new_top + cz_bot) / 2
+                # Guard: if the component's lower edge is already at/above the
+                # clamped top, the clamp yields a non-positive height which
+                # produces a degenerate sketch (OCCT exception / silent no-op).
+                # Fail loudly with a clear message instead.
+                if ch <= 0:
+                    raise ValueError(
+                        f"side cutout for component {getattr(sc, 'name', sc)!r} "
+                        f"on side {side!r} clamped to non-positive height "
+                        f"(ch={ch:.4f}); component bottom edge sits above "
+                        f"base_top_z-0.1 ({new_top:.4f}). Component too tall "
+                        f"or base too shallow for a side IO opening."
+                    )
 
         if side in ('left', 'right'):
             _cut_on_yz_plane(bd, wall_x, cy, cz, cw, ch, depth, sc.profile)
@@ -195,5 +207,47 @@ def _cut_top_display_windows(
 
         with bd.Locations((cx, cy, 0)):
             bd.Box(cw, ch, depth, mode=bd.Mode.SUBTRACT)
+        count += 1
+    return count
+
+
+# Body-geometry-aligned lid windows for single-component holders. Coords are
+# CENTER-ORIGIN matching the pcb_body builders' ACTUAL feature positions — NOT
+# _ui_hints.extra_ports, which drift from the rendered bodies (SCHEM-DEMO-1), so
+# deriving from extra_ports would mis-place the hole. (profile, cx, cy, w, h) in
+# mm; for 'circle', w is the diameter.
+_FACE_WINDOWS = {
+    # OLED screen window over the SSD1306 glass
+    # (build_oled_pcb_body OLED_Glass @ center (0, 3), 22x12 after fidelity fix).
+    "Display-OLED-class": [("rect", 0.0, 3.0, 22.0, 12.0)],
+    # HC-SR04 transducer holes
+    # (build_ultrasonic_pcb_body cyl @ center (±13, 0), dia 16 -> +1 clearance).
+    "Sensor-Ultrasonic-class": [("circle", -13.0, 0.0, 17.0, 17.0),
+                                ("circle", 13.0, 0.0, 17.0, 17.0)],
+}
+
+
+def _cut_face_windows(bd, class_name, lid_top_z, depth):
+    """Cut body-aligned viewing / sensor windows through the lid for single-component
+    holders (OLED screen, HC-SR04 transducers). Returns the number of windows cut.
+
+    Geometry is aligned to the pcb_body builder's real feature positions
+    (center-origin), deliberately NOT to extra_ports — the two drift apart
+    (SCHEM-DEMO-1), so an extra_ports-derived hole would not sit over the rendered
+    feature. No-op (returns 0) for classes without a registered window.
+    """
+    specs = _FACE_WINDOWS.get(class_name)
+    if not specs:
+        return 0
+    plane = bd.Plane.XY.offset(lid_top_z)
+    count = 0
+    for profile, cx, cy, w, h in specs:
+        with bd.BuildSketch(plane) as sk:
+            with bd.Locations((cx, cy)):
+                if profile == "circle":
+                    bd.Circle(w / 2)
+                else:
+                    bd.RectangleRounded(w, h, max(0.5, min(w, h) / 6))
+        bd.extrude(sk.sketch, amount=depth, both=True, mode=bd.Mode.SUBTRACT)
         count += 1
     return count

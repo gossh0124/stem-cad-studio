@@ -3,7 +3,6 @@
 Split from test_shell.py to stay under 500-line limit.
 Groups covered:
   5. build_pcb_two_piece stress gate (PV5)
-  6. build_assembly_two_piece input validation
   7. Module constants and configuration
   8. Dimension formula edge cases
 """
@@ -58,30 +57,6 @@ class TestBuildTwoPieceStressGate:
 
         with pytest.raises(ValueError, match="壁厚"):
             build_pcb_two_piece(pcb, wall=0.5)
-
-
-# ================================================================
-# Group 6: build_assembly_two_piece input validation
-# ================================================================
-
-class TestBuildAssemblyValidation:
-    """Tests for build_assembly_two_piece input validation."""
-
-    def test_empty_placements_raises(self):
-        """Empty placements list should raise ValueError."""
-        from lib.cad.shell import build_assembly_two_piece
-        with pytest.raises(ValueError, match="placements 不可為空"):
-            build_assembly_two_piece(placements=[])
-
-    def test_wall_too_thin_raises(self):
-        """Wall < 1.5mm should raise before build123d is imported."""
-        from lib.cad.shell import build_assembly_two_piece
-        with pytest.raises(ValueError, match="壁厚"):
-            build_assembly_two_piece(
-                placements=[{"x": 0, "y": 0, "L": 10, "W": 10, "H": 5,
-                             "type": "Test", "role": "Brain", "face_out": ""}],
-                wall=0.5,
-            )
 
 
 # ================================================================

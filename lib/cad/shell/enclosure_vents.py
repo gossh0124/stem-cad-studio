@@ -72,10 +72,15 @@ def _cut_louver_vents_base(
         wall_y = -outer_w / 2
         slit_z = -base_h / 2 + wall + _VENT_SLIT_H * 1.5
         total_w = n_slits * _VENT_SLIT_W + (n_slits - 1) * _VENT_SLIT_GAP
-        if total_w > outer_l - 2 * wall - 4:
-            n_slits = max(2, int((outer_l - 2 * wall - 4) /
-                                 (_VENT_SLIT_W + _VENT_SLIT_GAP)))
+        span = outer_l - 2 * wall - 4
+        if total_w > span:
+            n_slits = max(2, int(span / (_VENT_SLIT_W + _VENT_SLIT_GAP)))
             total_w = n_slits * _VENT_SLIT_W + (n_slits - 1) * _VENT_SLIT_GAP
+        # 即便重算後，最小 2 條 slit 仍可能超出可用牆面跨距（小型外殼）；
+        # 此時不可硬切，否則會在外殼角落外側破牆。改為跳過此 vent 並記錄原因。
+        if total_w > span:
+            _log_vent_skip("base", face, total_w, span)
+            continue
 
         start_x = -total_w / 2 + _VENT_SLIT_W / 2
         for i in range(n_slits):
@@ -103,10 +108,15 @@ def _cut_louver_vents_lid(
         slit_area = _VENT_SLIT_W * _VENT_SLIT_H
         n_slits = max(2, int(area_mm2 / slit_area))
         total_w = n_slits * _VENT_SLIT_W + (n_slits - 1) * _VENT_SLIT_GAP
-        if total_w > outer_l - 2 * wall - 4:
-            n_slits = max(2, int((outer_l - 2 * wall - 4) /
-                                 (_VENT_SLIT_W + _VENT_SLIT_GAP)))
+        span = outer_l - 2 * wall - 4
+        if total_w > span:
+            n_slits = max(2, int(span / (_VENT_SLIT_W + _VENT_SLIT_GAP)))
             total_w = n_slits * _VENT_SLIT_W + (n_slits - 1) * _VENT_SLIT_GAP
+        # 即便重算後，最小 2 條 slit 仍可能超出可用跨距（小型外殼）；
+        # 此時不可硬切，否則會破壞蓋體邊緣。改為跳過此 vent 並記錄原因。
+        if total_w > span:
+            _log_vent_skip("lid", face, total_w, span)
+            continue
 
         start_x = -total_w / 2 + _VENT_SLIT_W / 2
         for i in range(n_slits):
@@ -154,6 +164,15 @@ def _apply_vertical_edge_fillet(bd, build_part, radius: float) -> float:
                 _log_fillet_warn(exc, attempted=radius)
                 return 0.0
     return 0.0
+
+
+def _log_vent_skip(where: str, face: str, total_w: float, span: float):
+    import logging
+    logging.getLogger("cadhllm.cad.shell").warning(
+        "louver vent 略過（%s, face=%s）：最小 2 條 slit 跨距 %.1fmm 超出可用牆面 %.1fmm，"
+        "硬切會破牆，故不切此 vent。",
+        where, face, total_w, span,
+    )
 
 
 def _log_fillet_warn(exc, attempted: float = 0.0):

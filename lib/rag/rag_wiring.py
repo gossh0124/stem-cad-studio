@@ -324,15 +324,13 @@ def build_wiring_index(force: bool = False) -> int:
 
 
 def _ensure_index() -> bool:
-    """確保索引已建立（lazy init）。回傳 True 表示索引可用。"""
-    db = _get_db()
-    try:
-        tbl = db.open_table(COLL_WIRING)
-        if len(tbl) > 0:
-            return True
-    except Exception:
-        pass
+    """確保索引已建立（lazy init）。回傳 True 表示索引可用。
 
+    不可短路於「table 非空」即視為有效——那會讓陳舊/部分索引
+    通過 gate。改為一律走 build_wiring_index(force=False)，由其
+    count-equality 新鮮度檢查決定要跳過(數量相同)還是重建
+    (datasheet 元件數變動)。
+    """
     count = build_wiring_index(force=False)
     return count > 0
 

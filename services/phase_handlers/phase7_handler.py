@@ -46,11 +46,16 @@ class Phase7Handler(PhaseHandler):
         lock_path = job.lock_path or default_lock_path(job.job_id)
 
         # 讀取 Phase VI 驗證報告
-        verif = bridge.get("vlm_verification", {
-            "best_score": bridge.get("best_score", 75),
-            "best_result": {"issues": []},
-        })
-        score = verif.get("best_score", 75)
+        verif = bridge.get("vlm_verification")
+        if not isinstance(verif, dict) or "best_score" not in verif:
+            # Phase VI 驗證缺失或不完整 — 不可靜默偽造通過分數
+            self._log(progress_cb,
+                "⚠️ 缺少 Phase VI VLM 驗證報告（vlm_verification.best_score），"
+                "HITL 分數無已驗證基準")
+            verif = verif if isinstance(verif, dict) else {"best_result": {"issues": []}}
+            score = None
+        else:
+            score = verif.get("best_score")
         history: list = []
 
         self._log(progress_cb,
@@ -78,7 +83,8 @@ class Phase7Handler(PhaseHandler):
                     action = item.get("action", "accept")
                     params = item.get("params", {})
                     result = self._apply(bridge, action, params)
-                    score  = min(100, score + result.get("score_delta", 0))
+                    if score is not None:
+                        score = min(100, score + result.get("score_delta", 0))
                     history.append(result)
                     rnd += 1
                     self._log(progress_cb,
@@ -107,9 +113,17 @@ class Phase7Handler(PhaseHandler):
         # ── CAD 品質記錄 ──
         cad_out = bridge.get("cad_output", {})
         engine  = cad_out.get("engine", "unknown")
-        bridge["cad_quality"] = "production"
-        self._log(progress_cb,
-            f"✅ CAD 引擎 {engine}（生產級），BOM 緊固件指引有效")
+        # 依實際產出的幾何決定品質等級，不可無條件標記為 production
+        has_shell = bool(cad_out.get("bottom_stl")) or bool(cad_out.get("lid_stl"))
+        if has_shell:
+            bridge["cad_quality"] = "production"
+            self._log(progress_cb,
+                f"✅ CAD 引擎 {engine}（生產級），BOM 緊固件指引有效")
+        else:
+            bridge["cad_quality"] = "no_geometry"
+            self._log(progress_cb,
+                f"⚠️ CAD 引擎 {engine}：Phase IV 未產生主外殼幾何"
+                "（bottom_stl/lid_stl 皆缺），cad_quality 標記為 no_geometry")
 
         # ── 組裝 SOP 手冊產出 ─────────────────────────────────
         sop_path = write_assembly_sop(job, bridge, progress_cb)
@@ -164,6 +178,7 @@ class Phase7Handler(PhaseHandler):
             val   = round(min(4.0, old + delta), 2)
             hints["wall_thickness_mm"] = enc["wall_thickness_mm"] = val
             result.update(new_value=val, score_delta=5)
+            bridge["_needs_rerun_from_phase"] = 4  # 重新產生 CAD 幾何以反映新壁厚
             decisions.append({
                 "phase": "VII", "category": "wall_thickness",
                 "description": (
@@ -180,6 +195,7 @@ class Phase7Handler(PhaseHandler):
             val   = round(max(1.0, old - delta), 2)
             hints["wall_thickness_mm"] = enc["wall_thickness_mm"] = val
             result["new_value"] = val
+            bridge["_needs_rerun_from_phase"] = 4  # 重新產生 CAD 幾何以反映新壁厚
             decisions.append({
                 "phase": "VII", "category": "wall_thickness",
                 "description": (
@@ -195,6 +211,7 @@ class Phase7Handler(PhaseHandler):
             old_mat = enc.get("material", _ENC_DEFAULTS["material"])
             hints["material"] = enc["material"] = mat
             result.update(new_value=mat, score_delta=2)
+            bridge["_needs_rerun_from_phase"] = 4  # 重新產生 CAD 幾何以反映新材質
             props = _MATERIAL_PROPS.get(mat, {})
             decisions.append({
                 "phase": "VII", "category": "material_change",
@@ -216,6 +233,7 @@ class Phase7Handler(PhaseHandler):
             hints["enclosure_size"] = size
             enc["target_size"]      = size
             result.update(new_value=size, score_delta=3)
+            bridge["_needs_rerun_from_phase"] = 4  # 重新產生 CAD 幾何以反映新外殼尺寸
             decisions.append({
                 "phase": "VII", "category": "enclosure_resize",
                 "description": (

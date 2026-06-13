@@ -40,18 +40,15 @@ def build_temp_humid_pcb_body() -> bd.Compound:
     pcb = make_pcb_board(25.1, 15.1, T, PCB_BLUE, "CarrierPCB")
     parts.append(pcb)
 
-    # 白色塑膠本體 (居中，坐在載板上方)
-    add(parts, box(0, 0, T + 7.2 / 2, 15.5, 12.0, 7.2),
-        DOME_WHITE, "DHT11_Body")
+    # 白色塑膠本體 (居中，坐在載板上方) — SSOT bodyW=21 × bodyD=8.5
+    add(parts, box(0, 0, T + 7.2 / 2, 21.0, 8.5, 7.2),
+        DOME_WHITE, "DHT22_Body")
 
-    # 前面藍色裝飾條紋
-    add(parts, box(0, 6.05, T + 3.6, 15.5, 0.1, 12.0),
-        LED_BLUE, "BlueStripe")
-
-    # 通風柵格 — 3 條水平槽
-    for z_off in (2.0, 3.0, 4.0):
-        add(parts, box(0, 6.1, T + z_off, 8.0, 0.1, 0.8),
-            WHITE, "VentSlot")
+    # 感測柵格 — 前面凹陷的訊號柵格（DHT 招牌特徵）
+    # SSOT Sensing_Grid 17×4，淡藍灰色 #a0c8f0，與白色本體明顯區隔
+    GRID_BLUE = bd.Color(0.627, 0.784, 0.941)  # #a0c8f0
+    add(parts, box(0, 8.5 / 2 - 0.5, T + 7.2 / 2, 17.0, 1.0, 4.0),
+        GRID_BLUE, "Sensing_Grid")
 
     # 4 根金色引腳（向下穿過載板）
     x_start = -1.5 * PITCH
@@ -88,9 +85,6 @@ def build_ultrasonic_pcb_body() -> bd.Compound:
     add_smd_ic(parts, 0, -5.0, T, 5.0, 4.0, 1.5, "ReceiverIC")
 
     # 4-pin 排針 (-Y 短邊)
-    pins = [(x_start + i * PITCH, -9.0)
-            for i, x_start in enumerate([-1.5 * PITCH] * 4)
-            if True]  # 展開
     pins = [(-1.5 * PITCH + i * PITCH, -9.0) for i in range(4)]
     add_pin_header(parts, T, pins, "Hdr4", is_male=True)
 
@@ -108,27 +102,37 @@ def build_pir_pcb_body() -> bd.Compound:
     # 圓形 PCB（用圓柱模擬）
     add(parts, cyl(0, 0, T / 2, 16.0, T), PCB_GREEN, "PCB_Round")
 
-    # 白色菲涅爾透鏡罩 — 下層大圓柱 + 上層小圓柱
-    add(parts, cyl(0, 0, T + 11.0 / 2, 11.5, 11.0),
-        DOME_WHITE, "FresnelDome_Lower")
-    add(parts, cyl(0, 0, T + 11.0 + 3.0 / 2, 10.0, 3.0),
-        DOME_WHITE, "FresnelDome_Upper")
+    # 白色菲涅爾透鏡罩 — 圓潤半球穹頂（SSOT dome ⌀23），取代原平頂瓶蓋雙圓柱
+    # 圓柱裙座 + 上半球冠（整球減去下半部 → 平底貼合裙座頂面）
+    DOME_R = 11.5          # ⌀23mm
+    SKIRT_H = 1.5          # 裙座高度
+    add(parts, cyl(0, 0, T + SKIRT_H / 2, DOME_R, SKIRT_H),
+        DOME_WHITE, "FresnelDome_Skirt")
+    skirt_top = T + SKIRT_H
+    with bd.BuildPart() as _dome_bp:
+        with bd.Locations(bd.Location((0, 0, skirt_top))):
+            bd.Sphere(DOME_R)
+        # 削去赤道以下半球，使穹頂平底坐落於裙座頂面
+        with bd.Locations(bd.Location((0, 0, skirt_top - DOME_R))):
+            bd.Box(2 * DOME_R + 2, 2 * DOME_R + 2, 2 * DOME_R,
+                   mode=bd.Mode.SUBTRACT)
+    _dome = _dome_bp.part
+    add(parts, _dome, DOME_WHITE, "FresnelDome_Cap")
 
     # BISS0001 IC — DIP-8
     add(parts, box(-4.0, -3.0, T + 3.0 / 2, 10.0, 6.0, 3.0),
         IC_DARK, "BISS0001")
 
-    # 2 個微調電位器（板緣）
-    add_trimpot(parts, -10.0, 6.0, T, "TrimPot_Sens")
-    add_trimpot(parts, -10.0, -6.0, T, "TrimPot_Time")
+    # 2 個微調電位器（內縮至 x=-8，留在 ⌀32 圓板內）
+    add_trimpot(parts, -8.0, 6.0, T, "TrimPot_Sens")
+    add_trimpot(parts, -8.0, -6.0, T, "TrimPot_Time")
 
     # 3-pin 排針（底部邊緣 -Y 側）
     pins = [(-PITCH, -14.0), (0, -14.0), (PITCH, -14.0)]
     add_pin_header(parts, T, pins, "Hdr3_Out", is_male=True)
 
-    # 跳線排針 — 3-pin 近邊緣
-    jmp_pins = [(8.0, -10.0), (8.0, -10.0 + PITCH),
-                (8.0, -10.0 + 2 * PITCH)]
+    # 跳線排針 — 3-pin 沿底部邊緣（3 根座標各異，y=-12 完全避開 ⌀23 透鏡罩，且留在 ⌀32 板內）
+    jmp_pins = [(4.0 + i * PITCH, -12.0) for i in range(3)]
     add_pin_header(parts, T, jmp_pins, "Jumper", is_male=True)
 
     return bd.Compound(children=parts, label="Sensor-PIR-class")

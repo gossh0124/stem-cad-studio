@@ -335,6 +335,94 @@ def build_speaker_grill(spec: SpeakerGrillSpec | None = None):
 
 
 # ════════════════════════════════════════════════════════════════════
+# Generic component cradle（通用元件托座）— 給 B/C/D 類沒有 bespoke mount 的元件
+# ════════════════════════════════════════════════════════════════════
+# 使用者需求 2026-06-06：B/C/D 元件需有「外殼/托座」才能安裝到 assembly 殼體上
+# （水泵除外，沉水不裝殼內）。Brain 板用 2 件式 case;有專屬 mount 的致動器用其
+# builder;其餘一律用此通用 cradle —— 依元件 footprint 生成「開頂托盤 + 定位低牆 +
+# 兩端走線槽 + 平底（黏/鎖到殼體地板）」。
+
+@dataclass
+class GenericCradleSpec:
+    length: float = 30.0
+    width: float = 20.0
+    height: float = 10.0
+    wall: float = 2.0
+    floor_t: float = 2.0
+    tol: float = 0.6
+    lip_frac: float = 0.45        # 定位牆高 = height × frac（夾在 min/max）
+    lip_min: float = 3.0
+    lip_max: float = 9.0
+    wire_slot_w: float = 6.0
+    thermal_idle_mw: float = 0.0
+    thermal_peak_mw: float = 0.0
+    thermal_formula: str = 'passive holder (no active heat)'
+    thermal_source: str = 'generic component cradle'
+
+
+def build_generic_cradle(spec: 'GenericCradleSpec | None' = None):
+    """通用元件托座：開頂托盤,依 footprint 容納元件並以平底安裝到殼體地板。"""
+    import build123d as bd
+    s = spec or GenericCradleSpec()
+    inner_l = s.length + 2 * s.tol
+    inner_w = s.width + 2 * s.tol
+    lip_h = min(max(s.height * s.lip_frac, s.lip_min), s.lip_max)
+    outer_l = inner_l + 2 * s.wall
+    outer_w = inner_w + 2 * s.wall
+    total_h = s.floor_t + lip_h
+    slot_w = min(s.wire_slot_w, inner_w * 0.6)
+
+    with bd.BuildPart() as p:
+        bd.Box(outer_l, outer_w, total_h,
+               align=(bd.Align.CENTER, bd.Align.CENTER, bd.Align.MIN))
+        # 元件穴（開頂）— 留底厚 floor_t
+        with bd.Locations((0, 0, s.floor_t + lip_h / 2 + 0.6)):
+            bd.Box(inner_l, inner_w, lip_h + 1.2, mode=bd.Mode.SUBTRACT)
+        # 兩端短牆走線槽（讓線材出來）
+        for sx in (-1.0, 1.0):
+            with bd.Locations((sx * (outer_l / 2), 0, s.floor_t + lip_h / 2 + 0.6)):
+                bd.Box(s.wall * 3, slot_w, lip_h + 1.2, mode=bd.Mode.SUBTRACT)
+
+    info = dict(name='generic-cradle', outer_l=round(outer_l, 2),
+                outer_w=round(outer_w, 2), outer_h=round(total_h, 2),
+                lip_h=round(lip_h, 2))
+    return p.part, info
+
+
+def build_generic_two_piece(length, width, height, *, wall=2.0, floor_t=2.0,
+                            tol=0.6, lid_h=2.0, clearance_h=3.0):
+    """Generic MCU-style 2-piece case (base tray + lid) sized from a component footprint,
+    for holder-needing parts WITHOUT a PCBSpec. Mirrors build_pcb_two_piece's base+lid
+    structure so all holders share the MCU-case design language (user 2026-06-06:
+    比對 mcu 的外殼進行設計). Returns (base_part, lid_part, spec_dict)."""
+    import build123d as bd
+    inner_l = length + 2 * tol
+    inner_w = width + 2 * tol
+    inner_h = height + clearance_h
+    outer_l = inner_l + 2 * wall
+    outer_w = inner_w + 2 * wall
+    base_h = floor_t + inner_h
+    slot_w = min(6.0, inner_w * 0.5)
+
+    with bd.BuildPart() as base:
+        bd.Box(outer_l, outer_w, base_h, align=(bd.Align.CENTER, bd.Align.CENTER, bd.Align.MIN))
+        with bd.Locations((0, 0, floor_t + inner_h / 2 + 0.5)):
+            bd.Box(inner_l, inner_w, inner_h + 1, mode=bd.Mode.SUBTRACT)   # open-top cavity
+        for sx in (-1.0, 1.0):                                             # wire-exit slots
+            with bd.Locations((sx * outer_l / 2, 0, floor_t + inner_h / 2 + 0.5)):
+                bd.Box(wall * 3, slot_w, inner_h, mode=bd.Mode.SUBTRACT)
+
+    with bd.BuildPart() as lid:
+        bd.Box(outer_l, outer_w, lid_h, align=(bd.Align.CENTER, bd.Align.CENTER, bd.Align.MIN))
+
+    spec_dict = dict(inner_length=round(inner_l, 2), inner_width=round(inner_w, 2),
+                     inner_height=round(inner_h, 2), wall=wall, tol=tol,
+                     outer_l=round(outer_l, 2), outer_w=round(outer_w, 2),
+                     base_h=round(base_h, 2), lid_h=lid_h, kind='two_piece_generic')
+    return base.part, lid.part, spec_dict
+
+
+# ════════════════════════════════════════════════════════════════════
 # 統一註冊表
 # ════════════════════════════════════════════════════════════════════
 

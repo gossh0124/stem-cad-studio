@@ -3,8 +3,9 @@
 驗證後端 bridge 給前端 3D 渲染的必要欄位齊全且型別正確，
 堵住「後端產出對、前端讀不到欄位、靜默 fallback 成 ghost box」。
 
-對象：bridge["cad_output"]["component_placements"]——
-前端 assembly 渲染（views-engineer-assembly）逐欄讀取此清單擺放元件。
+對象：bridge["cad_output"]["scene_graph_v3"]["modules"]——
+前端 assembly 渲染（views-engineer-assembly-v3）逐筆讀取 module 的
+position[3] / dimensions[3] 擺放元件（B-3：V2 component_placements 契約已退役）。
 欄位缺漏 → 前端 fallback/錯位；座標非數值 → NaN/重疊。
 
 CLI：python -m lib.verification.contract  → 掃 v6/canned 所有 bridge 印契約狀態。
@@ -17,10 +18,6 @@ from pathlib import Path
 from .report import CheckResult, VerificationReport, Verdict
 
 _MODELS_ROOT = Path(__file__).resolve().parents[2] / "v6" / "models"
-
-# 前端 assembly 渲染逐筆讀取的 placement 欄位（來源：cad_output 實測 + scene 擺放需求）
-_PLACEMENT_REQUIRED = ("type", "role", "x", "y", "L", "W", "H", "face_out")
-_PLACEMENT_NUMERIC = ("x", "y", "L", "W", "H")
 
 
 def check_cad_output_contract(bridge: dict, *, name: str | None = None) -> VerificationReport:
@@ -39,42 +36,45 @@ def check_cad_output_contract(bridge: dict, *, name: str | None = None) -> Verif
         return rpt
     rpt.add(CheckResult("L1", "cad_output_present", Verdict.PASS))
 
-    placements = co.get("component_placements")
-    if not isinstance(placements, list) or not placements:
-        n = len(placements) if isinstance(placements, list) else 0
-        rpt.add(CheckResult("L1", "placements_present", Verdict.FAIL,
-                            message="component_placements 缺失或空", metric={"n": n}))
+    # B-3: the V2 component_placements contract was retired; the front-end renders from
+    # the V3 SceneGraph. Validate scene_graph_v3.modules each carry position[3] +
+    # dimensions[3] (numeric) — the data the assembly view consumes.
+    scene = co.get("scene_graph_v3")
+    modules = scene.get("modules") if isinstance(scene, dict) else None
+    if not isinstance(modules, list) or not modules:
+        n = len(modules) if isinstance(modules, list) else 0
+        rpt.add(CheckResult("L1", "scene_modules_present", Verdict.FAIL,
+                            message="scene_graph_v3.modules 缺失或空（前端無資料可渲染）", metric={"n": n}))
         return rpt
-    rpt.add(CheckResult("L1", "placements_present", Verdict.PASS, metric={"n": len(placements)}))
+    rpt.add(CheckResult("L1", "scene_modules_present", Verdict.PASS, metric={"n": len(modules)}))
 
-    # 欄位齊全
-    missing: dict = {}
+    # 欄位齊全：每 module 需 position[3] + dimensions[3]（皆數值）
+    bad_shape: dict = {}
     nonnumeric: dict = {}
-    for p in placements:
-        if not isinstance(p, dict):
-            missing["<not-dict>"] = missing.get("<not-dict>", 0) + 1
+    for m in modules:
+        if not isinstance(m, dict):
+            bad_shape["<not-dict>"] = bad_shape.get("<not-dict>", 0) + 1
             continue
-        for f in _PLACEMENT_REQUIRED:
-            if f not in p:
-                missing[f] = missing.get(f, 0) + 1
-        for f in _PLACEMENT_NUMERIC:
-            v = p.get(f)
-            if v is not None and not isinstance(v, (int, float)):
+        for f in ("position", "dimensions"):
+            v = m.get(f)
+            if not isinstance(v, (list, tuple)) or len(v) != 3:
+                bad_shape[f] = bad_shape.get(f, 0) + 1
+            elif any(not isinstance(x, (int, float)) for x in v):
                 nonnumeric[f] = nonnumeric.get(f, 0) + 1
 
-    if missing:
-        rpt.add(CheckResult("L1", "placement_fields_complete", Verdict.FAIL,
-                            message="placement 欄位缺漏（前端渲染會 fallback/錯位）",
-                            metric=missing))
+    if bad_shape:
+        rpt.add(CheckResult("L1", "module_fields_complete", Verdict.FAIL,
+                            message="scene module 缺 position/dimensions[3]（前端渲染會錯位）",
+                            metric=bad_shape))
     else:
-        rpt.add(CheckResult("L1", "placement_fields_complete", Verdict.PASS,
-                            metric={"checked_fields": len(_PLACEMENT_REQUIRED)}))
+        rpt.add(CheckResult("L1", "module_fields_complete", Verdict.PASS,
+                            metric={"checked_fields": 2}))
 
     if nonnumeric:
-        rpt.add(CheckResult("L1", "placement_numeric_types", Verdict.FAIL,
-                            message="座標/尺寸欄位非數值（前端會 NaN/重疊）", metric=nonnumeric))
+        rpt.add(CheckResult("L1", "module_numeric_types", Verdict.FAIL,
+                            message="position/dimensions 非數值（前端會 NaN/重疊）", metric=nonnumeric))
     else:
-        rpt.add(CheckResult("L1", "placement_numeric_types", Verdict.PASS))
+        rpt.add(CheckResult("L1", "module_numeric_types", Verdict.PASS))
 
     return rpt
 
@@ -234,6 +234,12 @@ def check_scene_graph_meshes(
                             metric={"n": len(missing_file), "examples": missing_file[:5]}))
     elif n_checked > 0:
         rpt.add(CheckResult("L1", "mesh_file_exists", Verdict.PASS))
+    else:
+        # 有 module 但完全沒宣告任何 mesh ref（meshes 為空或非 list）：
+        # 這正是 ghost box 失效模式——不可靜默通過，明確記為 FAIL。
+        rpt.add(CheckResult("L1", "mesh_file_exists", Verdict.FAIL,
+                            message="module 存在但未宣告任何 mesh 引用（前端無模型可載入 / ghost box）",
+                            metric={"n_modules": len(modules), "n_checked": 0}))
 
     return rpt
 

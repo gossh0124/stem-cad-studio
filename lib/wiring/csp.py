@@ -8,7 +8,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from lib.pin_maps import _INPUT_ONLY_PINS, _I2C_HW_PINS  # noqa: F401 (re-exported for tests)
+from lib.pin_maps import _INPUT_ONLY_PINS, _I2C_HW_PINS, label_mcu_pin  # noqa: F401 (re-exported for tests)
+from .comp_class_map import instance_base
 
 _log = logging.getLogger(__name__)
 
@@ -123,17 +124,55 @@ def _forward_check(
     return True
 
 
+def _max_bipartite_matching(adj: dict[str, list]) -> dict:
+    """Kuhn's augmenting-path maximum bipartite matching (pure stdlib).
+
+    `adj` maps each variable key -> list of candidate pins (its ACTUAL domain).
+    Returns {pin: var_key} for matched pins. |result| == size of max matching.
+    Complexity O(V * E); V = #vars, E = total domain entries — polynomial.
+    """
+    match_pin_to_var: dict = {}   # pin -> var_key
+
+    def _augment(var_key: str, seen: set) -> bool:
+        for pin in adj[var_key]:
+            if pin in seen:
+                continue
+            seen.add(pin)
+            holder = match_pin_to_var.get(pin)
+            if holder is None or _augment(holder, seen):
+                match_pin_to_var[pin] = var_key
+                return True
+        return False
+
+    for var_key in adj:
+        _augment(var_key, set())
+    return match_pin_to_var
+
+
+# Load-bearing bound: caps explored search-tree nodes so an infeasibility the
+# matching precheck cannot see (e.g. the I2C-shared-pin eviction interaction in
+# _forward_check) can never spin forever. Generous vs. real designs (<~30 vars,
+# MRV + forward-checking prune); worst observed infeasible case fails in ~1.2s.
+_MAX_BACKTRACK_NODES = 200_000
+
+
 def _backtrack(
     idx: int, ordered: list[_Var],
     domains: dict[str, list],
     assignment: dict[str, object],
     brain_key: str,
+    node_budget: list[int],
 ) -> bool:
-    """Recursive backtracking search.
+    """Recursive backtracking search (with a node-count safety bound).
 
     Returns True if a complete consistent assignment was found
-    (results are in `assignment`).
+    (results are in `assignment`). Returns False on dead-end OR if the
+    node budget is exhausted (hard guard against runaway search).
     """
+    node_budget[0] -= 1
+    if node_budget[0] <= 0:
+        return False   # safety bound hit → treat as no solution → conflict
+
     if idx == len(ordered):
         return True   # all variables assigned
 
@@ -151,7 +190,8 @@ def _backtrack(
         # Forward checking: snapshot domains, prune, recurse
         saved = {k: list(v) for k, v in domains.items()}
         ok = _forward_check(var, candidate, remaining, domains, brain_key)
-        if ok and _backtrack(idx + 1, ordered, domains, assignment, brain_key):
+        if ok and _backtrack(idx + 1, ordered, domains, assignment,
+                             brain_key, node_budget):
             return True
 
         # Undo
@@ -181,7 +221,9 @@ def csp_allocate(brain_key: str, comps: list[str],
     # ── 1. Build variables ──────────────────────────────────────
     variables: list[_Var] = []
     for comp in comps:
-        needs = comp_pin_needs.get(comp)
+        # class-level pin-needs lookup 去多實例尾綴；_Var.comp 保留完整實例名(如 Servo~2)
+        # 以產生獨立變數 → 每實例配到不同腳。
+        needs = comp_pin_needs.get(instance_base(comp))
         if not needs:
             continue
         for n in needs:
@@ -200,6 +242,7 @@ def csp_allocate(brain_key: str, comps: list[str],
     ordered = _mrv_order(variables, domains)
 
     # ── 4. Check feasibility before search ─────────────────────
+    # 4a. Local: any variable with an empty domain is unsatisfiable on its own.
     empty_vars = [v.key for v in ordered if not domains[v.key]]
     if empty_vars:
         conflicts = [
@@ -207,9 +250,45 @@ def csp_allocate(brain_key: str, comps: list[str],
         ]
         return {}, {}, conflicts
 
-    # ── 5. Backtracking search ──────────────────────────────────
+    # 4b. Global pin-budget (Hall's condition via max bipartite matching).
+    # Non-I2C vars each need a UNIQUE pin; I2C sda/scl vars share their fixed hw
+    # pin across all devices, impose no uniqueness demand, and are excluded.
+    # If the max matching between non-I2C vars and their ACTUAL candidate pins
+    # is smaller than the number of non-I2C vars, no injective (collision-free)
+    # assignment exists — the design is pin-infeasible. This is exact (Hall's
+    # theorem) for the uniqueness constraint and uses the same domains the
+    # backtracker uses, so it never rejects a design the backtracker would solve.
+    unique_vars = [v for v in ordered
+                   if v.pin_type not in ("i2c_sda", "i2c_scl")]
+    if unique_vars:
+        adj = {v.key: domains[v.key] for v in unique_vars}
+        matching = _max_bipartite_matching(adj)
+        if len(matching) < len(unique_vars):
+            matched_vars = set(matching.values())
+            unmatched = [v for v in unique_vars if v.key not in matched_vars]
+            # Report the SATURATED resource group, not the global union: count
+            # only the vars that compete for the over-subscribed pins (those
+            # sharing a candidate with an unmatched var) against the distinct
+            # pins in exactly that group. Reporting the global union would mix
+            # unrelated pools (e.g. digital/pwm + analog) and give a misleading
+            # "N needed, M available" with N < M while still rejecting.
+            short_pins = {p for v in unmatched for p in domains[v.key]}
+            competing = [v for v in unique_vars
+                         if short_pins.intersection(domains[v.key])]
+            need = len(competing)
+            have = len({p for v in competing for p in domains[v.key]})
+            unmatched_keys = sorted(v.key for v in unmatched)
+            conflicts = [
+                f"Not enough unique pins on {brain_key}: "
+                f"{need} pins needed, only {have} available "
+                f"(unsatisfiable: {', '.join(unmatched_keys)})"
+            ]
+            return {}, {}, conflicts
+
+    # ── 5. Backtracking search (bounded) ────────────────────────
     assignment: dict[str, object] = {}
-    success = _backtrack(0, ordered, domains, assignment, brain_key)
+    node_budget = [_MAX_BACKTRACK_NODES]
+    success = _backtrack(0, ordered, domains, assignment, brain_key, node_budget)
 
     if not success:
         # Build a human-readable conflict message
@@ -224,12 +303,11 @@ def csp_allocate(brain_key: str, comps: list[str],
         return {}, {}, parts or [f"CSP found no valid allocation for {brain_key}"]
 
     # ── 6. Pack results into allocate_pins return format ────────
-    pin_prefix = "P" if brain_key == "Microbit" else "D"
     allocation: dict[str, dict[str, object]] = {}
     pin_labels: dict[str, str] = {}
 
     for comp in comps:
-        needs = comp_pin_needs.get(comp)
+        needs = comp_pin_needs.get(instance_base(comp))
         if not needs:
             continue
         pins: dict[str, object] = {}
@@ -241,8 +319,7 @@ def csp_allocate(brain_key: str, comps: list[str],
             key = f"{comp}.{n.tag}"
             mcu_pin = assignment.get(key, "?")
             pins[n.tag] = mcu_pin
-            prefix = "" if n.type == "analog" else pin_prefix
-            parts.append(f"{n.tag}={prefix}{mcu_pin}")
+            parts.append(f"{n.tag}={label_mcu_pin(brain_key, mcu_pin)}")
         allocation[comp] = pins
         pin_labels[comp] = " / ".join(parts)
 

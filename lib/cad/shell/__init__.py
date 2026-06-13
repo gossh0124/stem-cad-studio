@@ -33,6 +33,7 @@ from .enclosure_io import (
     _apply_header_cutouts,
     _cut_assembly_io,
     _cut_top_display_windows,
+    _cut_face_windows,
 )
 from .enclosure_vents import (
     _cut_wire_grooves_lid,
@@ -40,6 +41,7 @@ from .enclosure_vents import (
     _cut_louver_vents_lid,
     _apply_vertical_edge_fillet,
 )
+from .assembly_v3_build import build_assembly_from_scene
 
 
 def build_pcb_enclosure(
@@ -183,7 +185,8 @@ def compute_two_piece_spec(
         standoff_height=standoff_height,
         standoff_count=len(pcb_spec.mounting_holes),
         side_cutout_count=sum(1 for sc in pcb_spec.sub_components
-                              if sc.protrudes == 'left' and sc.profile),
+                              if sc.protrudes in ('left', 'right', 'top', 'bottom')
+                              and sc.profile),
         lid_cutout_count=len(pcb_spec.header_groups),
         snap_count=4,
         snap_arm_w=snap_arm_w, snap_arm_t=snap_arm_t, snap_arm_h=snap_arm_h,
@@ -209,6 +212,7 @@ def build_pcb_two_piece(
     snap_gap: float = 0.1,
     snap_recess_extra: float = 0.4,
     material: str = "PLA",
+    class_name=None,
 ):
     """Build two-piece enclosure (base + lid + snap-fit).
 
@@ -269,6 +273,7 @@ def build_pcb_two_piece(
         snap_arm_w, snap_arm_t, snap_arm_h,
         snap_lip_h, snap_lip_d, snap_gap,
         cutout_clearance,
+        class_name,
     )
 
     spec = TwoPieceSpec(
@@ -341,6 +346,7 @@ def _build_two_piece_lid(
     snap_arm_w, snap_arm_t, snap_arm_h,
     snap_lip_h, snap_lip_d, snap_gap,
     cutout_clearance,
+    class_name=None,
 ):
     """Build lid: flat plate + header cutouts + snap arms."""
     flange = snap_gap + snap_arm_t
@@ -351,6 +357,9 @@ def _build_two_piece_lid(
 
         lid_cut_count = _apply_header_cutouts(
             bd, pcb_spec, L, W, top_z=0.0, depth=lid_h + 2,
+        )
+        lid_cut_count += _cut_face_windows(
+            bd, class_name, lid_top_z=0.0, depth=lid_h + 2,
         )
 
         for y_sign, arm_xs in snap_layout:
@@ -367,101 +376,3 @@ def _build_two_piece_lid(
 
     return lid.part, lid_cut_count
 
-
-def build_assembly_two_piece(
-    placements: List[dict],
-    project_name: str = "assembly",
-    padding: float = 4.0,
-    wall: float = 2.0,
-    tol: float = 0.3,
-    lid_thickness: float = 2.0,
-    fillet_r: float = _DEFAULT_FILLET_R,
-    cutout_clearance: float = 1.0,
-    wire_routes: Optional[list] = None,
-    vent_placements: Optional[list] = None,
-):
-    """E10: Build unified two-piece enclosure from assembly_solver placements.
-
-    Returns:
-        (base_part, lid_part, AssemblySpec)
-    """
-    _validate_wall_thickness(wall)
-    import build123d as bd
-
-    if not placements:
-        raise ValueError("placements 不可為空")
-
-    max_x = max(p["x"] + p["L"] for p in placements)
-    max_y = max(p["y"] + p["W"] for p in placements)
-    max_h = max(p["H"] for p in placements)
-
-    inner_l = max_x + 2 * padding
-    inner_w = max_y + 2 * padding
-    inner_h = max_h + padding
-
-    outer_l = inner_l + 2 * (wall + tol)
-    outer_w = inner_w + 2 * (wall + tol)
-    base_h = wall + inner_h
-    lid_h = lid_thickness
-
-    n_io = 0
-    n_wire = 0
-    n_vent_base = 0
-
-    with bd.BuildPart() as base:
-        bd.Box(outer_l, outer_w, base_h)
-
-        cavity_h = inner_h + 0.5
-        cavity_z = -base_h/2 + wall + cavity_h/2 - 0.25
-        with bd.Locations((0, 0, cavity_z)):
-            bd.Box(inner_l, inner_w, cavity_h, mode=bd.Mode.SUBTRACT)
-
-        n_io = _cut_assembly_io(
-            bd, placements, inner_l, inner_w, outer_l, outer_w, base_h, wall,
-            cutout_clearance,
-        )
-
-        n_vent_base = _cut_louver_vents_base(
-            bd, vent_placements or [], outer_l, outer_w, base_h, wall,
-        )
-
-        actual_fillet_base = (_apply_vertical_edge_fillet(bd, base, fillet_r)
-                              if fillet_r > 0 else 0.0)
-
-    n_vent_lid = 0
-    n_top_windows = 0
-    with bd.BuildPart() as lid:
-        bd.Box(outer_l, outer_w, lid_h)
-
-        if wire_routes:
-            n_wire = _cut_wire_grooves_lid(
-                bd, wire_routes, lid_h, inner_l, inner_w,
-            )
-
-        n_top_windows = _cut_top_display_windows(
-            bd, placements, lid_h, inner_l, inner_w, cutout_clearance,
-        )
-
-        n_vent_lid = _cut_louver_vents_lid(
-            bd, vent_placements or [], outer_l, outer_w, lid_h, wall,
-        )
-
-        actual_fillet_lid = (_apply_vertical_edge_fillet(bd, lid, fillet_r)
-                             if fillet_r > 0 else 0.0)
-
-    actual_fillet = min(actual_fillet_base, actual_fillet_lid) if fillet_r > 0 else 0.0
-
-    spec = AssemblySpec(
-        outer_l=outer_l, outer_w=outer_w,
-        base_h=base_h, lid_h=lid_h,
-        inner_l=inner_l, inner_w=inner_w, inner_h=inner_h,
-        wall=wall, tol=tol,
-        fillet_r=actual_fillet,
-        n_components=len(placements),
-        n_io_cutouts=n_io,
-        n_wire_grooves=n_wire,
-        n_vents=n_vent_base + n_vent_lid,
-        n_top_windows=n_top_windows,
-        project_name=project_name,
-    )
-    return base.part, lid.part, spec

@@ -11,7 +11,7 @@ from .shell import (
     build_pcb_enclosure,
     build_pcb_two_piece,
     compute_two_piece_spec,
-    build_assembly_two_piece,
+    build_assembly_from_scene,
     EnclosureSpec,
     TwoPieceSpec,
     AssemblySpec,
@@ -27,12 +27,22 @@ from .mounts import (
     build_speaker_grill,
     ALL_MOUNTS,
 )
+from .component_bodies import (
+    gen_motor_dc as gen_body_motor_dc,
+    gen_motor_servo as gen_body_motor_servo,
+    gen_motor_stepper as gen_body_motor_stepper,
+    gen_pump_water,
+    gen_speaker,
+    gen_l298n,
+    _GEN_MAP as COMPONENT_BODY_GEN_MAP,
+    bake_all as bake_component_bodies,
+)
 
 __all__ = [
     'build_pcb_enclosure',
     'build_pcb_two_piece',
     'compute_two_piece_spec',
-    'build_assembly_two_piece',
+    'build_assembly_from_scene',
     'EnclosureSpec',
     'TwoPieceSpec',
     'AssemblySpec',
@@ -47,4 +57,13 @@ __all__ = [
     'build_water_pump_sleeve',
     'build_speaker_grill',
     'ALL_MOUNTS',
+    # Component body meshes (Phase 2a C-1, salvaged from V2)
+    'gen_body_motor_dc',
+    'gen_body_motor_servo',
+    'gen_body_motor_stepper',
+    'gen_pump_water',
+    'gen_speaker',
+    'gen_l298n',
+    'COMPONENT_BODY_GEN_MAP',
+    'bake_component_bodies',
 ]

@@ -113,6 +113,38 @@ def _scan_shells_l0() -> int:
     return len(failed)
 
 
+def _scan_canned_baked() -> int:
+    """Startup completeness check (advisory): warn if any canned demo lacks a baked
+    assembly enclosure (cad_output.bottom_stl ref + the referenced STL on disk). Without
+    it the demo renders components with no 外殼 (ghost-box shells). Run via to_thread."""
+    import json
+    canned_dir = Path(__file__).resolve().parent.parent.parent / "v6" / "canned"
+    _log = _log_mod.getLogger("cadhllm.gateway")
+    if not canned_dir.exists():
+        return 0
+    unbaked = []
+    for bridge in sorted(canned_dir.glob("*.json")):
+        if bridge.name == "_index.json":
+            continue
+        try:
+            co = json.loads(bridge.read_text("utf-8")).get("cad_output", {}) or {}
+        except (OSError, ValueError):
+            continue
+        ref = co.get("bottom_stl")
+        if not ref:
+            unbaked.append(bridge.stem)
+        elif not (canned_dir.parent / str(ref).lstrip("/")).exists():
+            unbaked.append(bridge.stem + "(ref-missing)")
+    if unbaked:
+        _log.warning(
+            "Canned completeness: %d demo(s) lack baked assembly enclosure — components "
+            "will render with NO shell. Fix: python -m scripts.builders.bake_canned_full  [%s]",
+            len(unbaked), ", ".join(unbaked[:10]))
+    else:
+        _log.info("Canned completeness OK: all demos have baked enclosures")
+    return len(unbaked)
+
+
 async def _zombie_cleanup():
     while True:
         await asyncio.sleep(_ZOMBIE_INTERVAL_S)
@@ -161,6 +193,8 @@ async def lifespan(app: FastAPI):
     if n_fails:
         _logger.warning("%d shell(s) failed L0 — CAD output may show ghost boxes", n_fails)
 
+    await asyncio.to_thread(_scan_canned_baked)
+
     import concurrent.futures
     _pool_size = int(os.environ.get("CADHLLM_THREAD_POOL", "80"))
     if "CADHLLM_THREAD_POOL" not in os.environ:
@@ -199,7 +233,7 @@ app.add_middleware(
 # ── 開發用 no-cache middleware：前端靜態檔一律不快取 ──
 # 在 ASGI 層攔截：(1) 剝除請求的 if-none-match/if-modified-since 防 304
 #                  (2) 剝除回應的 etag/last-modified，注入 no-cache
-_DEV_NO_CACHE_EXT = (".jsx", ".css", ".html", ".js", ".json")
+_DEV_NO_CACHE_EXT = (".jsx", ".css", ".html", ".js", ".json", ".stl", ".glb")  # +stl/glb: canned demo enclosures under /canned/ regen fresh on F5
 _DEV_NO_CACHE_PREFIX = ("/api/shells/",)  # GLB/STL shell assets — 不快取，F5 即可取最新
 _STRIP_REQ = {b"if-none-match", b"if-modified-since"}
 _STRIP_RES = {b"etag", b"last-modified"}

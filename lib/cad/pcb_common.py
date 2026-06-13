@@ -211,10 +211,21 @@ def export_glb(compound: bd.Compound, path: str) -> bool:
             errors.append(f'{label}: {exc}')
 
     if n_teal:
-        log.warning('export_glb: %d children color=None (teal fallback)', n_teal)
+        # No-Silent-Fallback: a child with no assigned color is a modeling bug.
+        # The teal fallback masks lost per-component coloring — fail loudly.
+        raise RuntimeError(
+            f"GLB export integrity failure: {n_teal} child(ren) had color=None "
+            f"(would silently get teal fallback rgba [0,84,107]). "
+            f"Every component must have an explicit color."
+        )
     if len(color_set) < 3 and len(meshes) > 10:
-        log.warning('export_glb: low color diversity: %d unique in %d meshes',
-                    len(color_set), len(meshes))
+        # A board with >10 meshes but <3 unique colors rendered nearly monochrome
+        # → per-component coloring was lost. This is an integrity violation, not a warning.
+        raise RuntimeError(
+            f"GLB export integrity failure: low color diversity "
+            f"({len(color_set)} unique color(s) across {len(meshes)} meshes). "
+            f"Per-component coloring appears to have been lost."
+        )
 
     if errors:
         raise RuntimeError(

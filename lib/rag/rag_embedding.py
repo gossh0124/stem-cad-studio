@@ -79,7 +79,7 @@ def _get_embed_model():
         _embed_model = SentenceTransformer(_EMBED_MODEL_NAME)
         _log.info("Embedding model loaded: %s (dim=%d)",
                   _EMBED_MODEL_NAME,
-                  _embed_model.get_embedding_dimension())
+                  _embed_model.get_sentence_embedding_dimension())
         return _embed_model
 
 
@@ -94,7 +94,7 @@ def check_db_dimension_compat():
     except Exception:
         return
     model = _get_embed_model()
-    expected_dim = model.get_embedding_dimension()
+    expected_dim = model.get_sentence_embedding_dimension()
     all_colls = [COLL_COMPONENTS, COLL_CASES, COLL_ASSEMBLY, "comp_wiring"]
     for coll_name in all_colls:
         try:
@@ -104,14 +104,17 @@ def check_db_dimension_compat():
                 continue
             vec = sample["vector"][0]
             actual_dim = len(vec) if hasattr(vec, "__len__") else 0
-            if actual_dim and actual_dim != expected_dim:
-                _log.warning(
-                    "Collection '%s' dim=%d != model dim=%d — dropping for rebuild",
-                    coll_name, actual_dim, expected_dim,
-                )
-                db.drop_table(coll_name)
         except Exception:
-            pass  # table doesn't exist yet
+            continue  # table doesn't exist yet
+        # NOTE: drop_table failures must NOT be swallowed — a known dimension
+        # mismatch that we fail to drop would let a stale-dim collection survive
+        # and silently corrupt downstream search. Let it propagate.
+        if actual_dim and actual_dim != expected_dim:
+            _log.warning(
+                "Collection '%s' dim=%d != model dim=%d — dropping for rebuild",
+                coll_name, actual_dim, expected_dim,
+            )
+            db.drop_table(coll_name)
 
 
 @lru_cache(maxsize=512)

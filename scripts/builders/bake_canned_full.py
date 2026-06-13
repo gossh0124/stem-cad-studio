@@ -26,7 +26,7 @@ try:
 except (AttributeError, OSError):
     pass
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # scripts/builders/ → repo root (3 levels)
 sys.path.insert(0, str(ROOT))
 
 # 確保 ANTHROPIC API key 為空（避免任何意外的 LLM 呼叫）
@@ -82,7 +82,6 @@ def bake_template(tpl_id: str, canned_dir: Path) -> dict:
 
     handler = Phase4Handler()
     t0 = time.time()
-    material_fallback_used = False
     try:
         bridge, result = handler.execute(job, bridge, progress_cb=_emit)
     except Exception as exc:
@@ -100,7 +99,6 @@ def bake_template(tpl_id: str, canned_dir: Path) -> dict:
         hints = bridge.setdefault("cot_plan", {}).setdefault("parameter_hints", {})
         orig_material = hints.get("material")
         hints["material"] = "PETG"
-        material_fallback_used = True
         try:
             bridge, result = handler.execute(job, bridge, progress_cb=_emit)
         except Exception as exc2:
@@ -108,8 +106,15 @@ def bake_template(tpl_id: str, canned_dir: Path) -> dict:
             return {"status": "error",
                     "reason": f"PETG fallback 仍失敗：{exc2}",
                     "trace": traceback.format_exc()}
-        # 還原 hints.material 給 UI（cad_output.spec.material 由 phase4 寫入，會反映實際 PETG）
-        bridge.setdefault("cot_plan", {}).setdefault("parameter_hints", {})["material"] = orig_material
+        # No-Silent-Fallback：實際以 PETG 烤製，cot_plan/parameter_hints.material 必須與
+        # cad_output.spec.material（phase4 寫入）一致，否則 UI 與 RAG 會謊報 PLA。
+        # 不還原 orig_material；改記錄 provenance，讓 SSOT 一致且可追溯。
+        bridge.setdefault("cot_plan", {}).setdefault("parameter_hints", {})["material"] = "PETG"
+        bridge["material_fallback"] = {
+            "from": orig_material,
+            "to": "PETG",
+            "reason": "PV5 snap-fit PLA stress fail",
+        }
     elapsed = time.time() - t0
 
     # 將生成的 STL 從 output/{slug}/cad/ 複製到 v6/canned/{tpl_id}/
@@ -158,6 +163,7 @@ def bake_template(tpl_id: str, canned_dir: Path) -> dict:
         "shells": len(co.get("component_shells", [])),
         "placements": len(co.get("component_placements", [])),
         "bottom_stl": co.get("bottom_stl"),
+        "material_fallback": bridge.get("material_fallback"),
     }
 
 

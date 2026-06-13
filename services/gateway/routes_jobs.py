@@ -112,7 +112,7 @@ async def _make_event_stream(runner, job, q):
                     loop.run_in_executor(None, tq.get, True, 15.0),
                     timeout=16.0,
                 )
-            except (asyncio.TimeoutError, Exception):
+            except asyncio.TimeoutError:
                 yield f"data: {json.dumps({'event':'heartbeat'})}\n\n"
                 continue
             if msg is None:
@@ -302,6 +302,8 @@ async def resume_job(job_id: str, token_job_id: str = Depends(get_token_job_id))
             job.phase_results.append(result)
             job.status = JobStatus.SUCCESS
         except Exception as exc:
+            tb = _traceback.format_exc()
+            _log.error("Phase VII resume failed for job %s: %s\n%s", job_id, exc, tb)
             job.status = JobStatus.FAILED
             job.error  = str(exc)
         finally:
@@ -342,12 +344,39 @@ async def fork_template(req: ForkTemplateRequest) -> dict:
     bridge["forked_from_template"] = req.template_id
     bridge["project_name"] = f"{bridge.get('project_name', req.template_id)}_fork"
 
+    # Verify the baked assembly enclosure actually exists before asserting SUCCESS.
+    # Mirrors main._scan_canned_baked: cad_output.bottom_stl ref + the referenced STL
+    # on disk. Without it the fork would render components with NO 外殼 (ghost boxes)
+    # while still claiming a fully-successful phase-5 job — an always-green gate.
+    cad_output = bridge.get("cad_output", {}) or {}
+    bottom_stl_ref = cad_output.get("bottom_stl")
+    canned_root = canned_path.parent.parent  # .../v6
+    if not bottom_stl_ref:
+        raise HTTPException(
+            422,
+            f"範本 '{req.template_id}' 尚未 bake 外殼（cad_output.bottom_stl 缺失），"
+            f"無法 fork 為成功專案。請先執行 bake_canned_full。",
+        )
+    if not (canned_root / str(bottom_stl_ref).lstrip("/")).exists():
+        raise HTTPException(
+            422,
+            f"範本 '{req.template_id}' 的外殼 STL 不存在於磁碟（{bottom_stl_ref}），"
+            f"無法 fork 為成功專案。請先執行 bake_canned_full。",
+        )
+
+    checkpoint_phase = bridge.get("checkpoint_phase")
+    if checkpoint_phase is None:
+        raise HTTPException(
+            422,
+            f"範本 '{req.template_id}' 缺少 checkpoint_phase，無法判定完成階段。",
+        )
+
     job = Job(
         project_name=bridge["project_name"],
         instruction=bridge.get("_instruction", ""),
         status=JobStatus.SUCCESS,
     )
-    job.current_phase = bridge.get("checkpoint_phase", 5)
+    job.current_phase = checkpoint_phase
     job.lock_path = default_lock_path(job.job_id)
     job.bridge_path = save_bridge(job.job_id, bridge)
     _get_queue().enqueue(job)
@@ -368,10 +397,12 @@ async def sse_generate(
     instruction: str = Query(default="", max_length=2000),
     resume_job_id: str = "",
     resume_from: int = 0,
+    token_job_id: str = Depends(get_token_job_id),
 ):
     q = _get_queue()
 
     if resume_job_id and resume_from > 0:
+        require_job_owner(token_job_id, resume_job_id)
         existing_job = q.get(resume_job_id)
         if not existing_job:
             raise HTTPException(404, f"找不到 Job: {resume_job_id}")

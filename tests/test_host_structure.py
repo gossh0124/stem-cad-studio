@@ -110,6 +110,21 @@ class TestEmbeddedPlacement:
         assert ref["face_out"] == "top"
         assert ref["zone"] == "embedded-water_tank"
 
+    def test_embedded_entry_port_missing_uv_raises(self):
+        """H7/NSF: entry_port dict present but missing u/v must raise, not silent-center 0.5."""
+        bad_hs = {
+            "kind": "water_tank",
+            "dimensions": {"length_mm": 120.0, "width_mm": 80.0, "height_mm": 60.0},
+            "entry_port": {"face": "top"},  # u/v deliberately absent
+        }
+        fake_reg = {"Emb-class": _make_spec("embedded", bad_hs)}
+        with pytest.raises(ValueError, match="u/v"):
+            solve(
+                [{"type": "Emb-class", "role": "Sensor"}],
+                _EMPTY_WIRING, _ENCLOSURE_SPEC,
+                user_spec_fn=lambda cls: fake_reg.get(cls),
+            )
+
     def test_embedded_placement_v2_fallback(self):
         """Missing dict -> solver uses inner_l/2, inner_w/2."""
         fake_reg = {"Emb-class": _make_spec("embedded", "external_body")}

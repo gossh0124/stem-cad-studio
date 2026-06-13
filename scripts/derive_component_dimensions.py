@@ -24,10 +24,39 @@ ROOT = Path(__file__).resolve().parent.parent
 SSOT_JSON = ROOT / "data" / "component_datasheet_verified.json"
 DIMS_JS = ROOT / "v6" / "data" / "component-dimensions.js"
 
+# Arduino-Uno-class 的 dims.js 區塊由 lib/pcb/layout_export.py 從 EAGLE .brd 真實本體中心
+# 權威衍生（SSOT-AUTO-GENERATED marker 段），label/座標來源與 verified.json on_board 慣例
+# 不同（如 'NCP1117-5V' vs 'V-Reg-5V'、.brd 中心 vs bbox）。此 deriver 不擁有該 class，
+# 否則 --write 會覆蓋 layout_export 段、--check 會誤報雙權威衝突。見 layout_export 模組註解。
+_LAYOUT_EXPORT_OWNED = frozenset({"Arduino-Uno-class"})
+
+
 # 受測元件清單：自動從 verified.json 抓所有有 _ui_hints 的元件
 def _all_classes_with_hints() -> list[str]:
     ssot = json.loads(SSOT_JSON.read_text(encoding="utf-8"))
-    return sorted(c for c, v in ssot.items() if "_ui_hints" in v)
+    return sorted(c for c, v in ssot.items()
+                  if "_ui_hints" in v and c not in _LAYOUT_EXPORT_OWNED)
+
+
+_SOLID_BODY_SHAPES = frozenset({
+    "ic-soic", "ic-qfp", "ic-dip", "ic-module",
+    "box", "heatsink", "vreg-to220", "display-panel",
+    "toggle-switch", "slide-switch",
+    "crystal-hc49", "res-smd", "cap-electrolytic",
+})
+
+
+def _is_solid_shape(shape: str) -> bool:
+    """True if shape is a single-instance solid body (not a header/hole/region/wire).
+    Two solid bodies sharing one coordinate ⇒ same physical part drawn twice."""
+    return shape in _SOLID_BODY_SHAPES
+
+
+def _norm_label(s) -> str:
+    """正規化 sub-component label 以比對 stale extra_ports：底線/連字號→空白、小寫、
+    壓縮空白。截斷比對（前綴）在呼叫端另加座標重合確認。"""
+    s = str(s).strip().lower().replace("_", " ").replace("-", " ").replace("/", " ")
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def derive_ports(class_name: str, spec: dict) -> list[dict]:
@@ -58,7 +87,50 @@ def derive_ports(class_name: str, spec: dict) -> list[dict]:
         })
 
     # extra_ports（無 on_board_components 對應的純邏輯 port，如 WIRES）
+    # VS-DEDUP（2026-06-06）：extra_ports label 若與 on_board_components label 撞名 → 跳過。
+    # datasheet on_board_components 永遠勝;防 stale extra_ports 以舊手設座標蓋過 datasheet
+    # bbox 位置造成 render drift（曾致 34 個子元件最大 40mm 偏移）。預防測試見
+    # tests/test_no_stale_extra_ports.py。
+    #
+    # VS-DEDUP-2（2026-06-07，ic-subcomponent-overlap）：舊 guard 只比 label 精確相等，
+    # 漏掉「同一實體子元件被 extra_ports 用 mangled label 再定義一次」的 stale entry——
+    # mangling = 底線→空白、大小寫變動、12 字截斷（如 'ASIC_IC'→'ASIC IC'、
+    # 'WS2812B_LED_2'→'WS2812B LED '、'Crystal-16MHz'→'Crystal-16MH'），或同義改名+座標漂移
+    # （如 'L298N'→'L298N-IC'、'SPDT Toggle'→'SLIDE-SW'、'HLK-PM01'→'TRANSFORMER'）。這些
+    # 重複 port 造成兩個本體疊在一起（IC port overlap 紅）。
+    #
+    # 判 stale（datasheet on_board 永遠勝）採三訊號，任一成立即跳過：
+    #   (1) 正規化 label 相等；
+    #   (2) 正規化 label 一方為另一方前綴（≥8 字）；
+    #   (3) 正規化 token 一方為另一方子集（如 'sensitivity' ⊂ 'sensitivity trimpot'）；
+    #   (4) 同槽位重合：兩者皆 solid（非 header / 非 mounting-hole）shape 且座標 ≤1.5mm 重疊
+    #       —— 兩個實體本體不可能合法佔同一座標，必為同一零件重畫。
+    # 不採「跨命名 + 漂移座標」的模糊匹配（避免誤刪合法相異零件如 4 個 Wheel、Sensing Grid）。
+    _obc_rendered = [p for p in ports]  # 已含 on_board_components 衍生 port（帶 cx/cy）
+
+    def _is_stale_extra(extra: dict) -> bool:
+        ne = _norm_label(extra.get("label"))
+        te = {t for t in ne.split() if len(t) >= 2}
+        ex, ey = extra.get("cx"), extra.get("cy")
+        e_solid = _is_solid_shape(extra.get("shape", ""))
+        for p in _obc_rendered:
+            npp = _norm_label(p["label"])
+            if ne == npp:
+                return True
+            if len(ne) >= 8 and len(npp) >= 8 and (ne.startswith(npp) or npp.startswith(ne)):
+                return True
+            tp = {t for t in npp.split() if len(t) >= 2}
+            if te and tp and (te <= tp or tp <= te):
+                return True
+            if (e_solid and _is_solid_shape(p.get("shape", ""))
+                    and ex is not None and ey is not None
+                    and abs(ex - p["cx"]) <= 1.5 and abs(ey - p["cy"]) <= 1.5):
+                return True
+        return False
+
     for extra in ui.get("extra_ports", []):
+        if _is_stale_extra(extra):
+            continue  # datasheet on_board_components 已涵蓋此實體子元件，extra_ports 為 stale
         ports.append({
             "side": extra.get("side", "face"),
             "cx": extra["cx"],
@@ -81,15 +153,18 @@ def derive_ports(class_name: str, spec: dict) -> list[dict]:
             pins = hg.get("pins", [])
             if not pins:
                 continue
-            cx = sum(p.get("x_mm", 0) for p in pins) / len(pins)
-            cy = sum(p.get("y_mm", 0) for p in pins) / len(pins)
+            # P6.3/no-silent-fallback(a):pin 座標是 SSOT 真值,缺值不得以 0 頂替
+            # (會把質心拉向原點,假幾何流進 Gate-1 衍生)→ 直接索引,缺鍵 KeyError fail-loud。
+            cx = sum(p["x_mm"] for p in pins) / len(pins)
+            cy = sum(p["y_mm"] for p in pins) / len(pins)
             info = shape_map.get(name, {})
             # pitch：明示 pitch_mm 優先；否則從真實 pin 座標推導（SSOT，不漂移）；
             # 皆不可得才 raise（VS-PCB：禁以 2.54 頂替非標準連接器）。
             pitch = hg.get("pitch_mm")
             if pitch is None:
-                _pxs = [p.get("x_mm", 0) for p in pins]
-                _pys = [p.get("y_mm", 0) for p in pins]
+                # 同上:pitch 推導餵假 0 會放大 span → 推錯 pitch;缺鍵 fail-loud。
+                _pxs = [p["x_mm"] for p in pins]
+                _pys = [p["y_mm"] for p in pins]
                 _span = (max(max(_pxs) - min(_pxs), max(_pys) - min(_pys))
                          if len(pins) >= 2 else 0)
                 if len(pins) < 2 or _span <= 0:
@@ -307,12 +382,41 @@ def check_drift(class_name: str, ssot: dict, dims_text: str, tol: float = 0.1,
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="drift gate mode: exit 1 on mismatch")
+    ap.add_argument("--write", action="store_true",
+                    help="in-place rewrite each hinted class block in dims.js from SSOT")
     ap.add_argument("--class", dest="cls", help="only process one class")
     ap.add_argument("--tol", type=float, default=0.1)
     args = ap.parse_args()
 
     ssot = json.loads(SSOT_JSON.read_text(encoding="utf-8"))
     classes = [args.cls] if args.cls else _all_classes_with_hints()
+
+    if args.write:
+        # newline="" 保留檔案原生行尾（dims.js 為 LF）；避免 Windows 預設把 LF→CRLF 造成全檔 churn。
+        with open(DIMS_JS, "r", encoding="utf-8", newline="") as _f:
+            dims_text = _f.read()
+        changed = 0
+        missing: list[str] = []
+        for c in classes:
+            spec = ssot.get(c)
+            if not spec:
+                continue
+            old_block = _extract_dims_entry(dims_text, c)
+            if old_block is None:
+                missing.append(c)
+                continue
+            new_block = fmt_entry_js(c, derive_entry(c, spec))
+            if "\r\n" in dims_text:
+                new_block = new_block.replace("\n", "\r\n")  # 對齊原生 CRLF（若有）
+            if old_block != new_block:
+                dims_text = dims_text.replace(old_block, new_block, 1)
+                changed += 1
+        with open(DIMS_JS, "w", encoding="utf-8", newline="") as _f:
+            _f.write(dims_text)
+        if missing:
+            print(f"[WARN] {len(missing)} hinted classes not found in dims.js: {missing}")
+        print(f"[OK] dims.js rewritten: {changed} class block(s) updated from SSOT")
+        return 0
 
     if args.check:
         dims_text = DIMS_JS.read_text(encoding="utf-8")

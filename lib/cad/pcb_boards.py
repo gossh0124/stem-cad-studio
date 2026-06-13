@@ -13,9 +13,9 @@ from lib.cad.pcb_common import (        # noqa: E402
     bd, box, cyl, add, make_pcb_board,
     add_pin_header, add_smd_ic, add_led, export_pcb,
     PCB_BLUE, PCB_GREEN, PCB_BLACK,
-    METAL, BLACK, IC_DARK, PIN_GOLD,
+    METAL, METAL_DARK, BLACK, IC_DARK, PIN_GOLD,
     LED_GREEN, LED_RED, LED_BLUE, WHITE,
-    USB_SILVER, SHIELD_TIN, GOLD_TRACE,
+    USB_SILVER, SHIELD_TIN, GOLD_TRACE, DOME_WHITE,
 )
 
 # =====================================================================
@@ -44,31 +44,68 @@ def build_esp32_pcb_body() -> bd.Compound:
     # --- PCB 基板 ---
     parts.append(make_pcb_board(L, W, T, PCB_BLUE, "ESP32_PCB"))
 
-    # --- ESP-WROOM-32 RF 模組 (shielded can, antenna at +X edge) ---
+    # --- ESP-WROOM-32 RF 模組 (SHIELD_TIN metal can + shallow top recess) ---
     # Real module: 18 (Y) × 25.5 (X) × 3.1 mm. Long axis along PCB length.
+    # SSOT frontend_shape ic-module bodyW=25.5 bodyD=18 bodyH=3.1; can has a
+    # stamped lid with a shallow recess (subtract a thinner inner box from top).
     mod_dx, mod_dy, mod_dz = 25.5, 18.0, 3.2
-    mod_cx = L / 2 - mod_dx / 2 - 0.8        # 0.8mm clear at +X for antenna
-    add(parts, box(mod_cx, 0.0, pz + mod_dz / 2,
-                   mod_dx, mod_dy, mod_dz),
-        SHIELD_TIN, "ESP_WROOM32")
+    mod_cx = L / 2 - mod_dx / 2 - 3.0        # leave +X room for antenna stub
+    recess_depth = 0.5                        # shallow stamped lid recess
+    with bd.BuildPart() as _can:
+        with bd.Locations(bd.Location((mod_cx, 0.0, pz + mod_dz / 2))):
+            bd.Box(mod_dx, mod_dy, mod_dz)
+        # recess: inner box cut from the top face, leaving a ~1mm rim
+        with bd.Locations(bd.Location(
+                (mod_cx, 0.0, pz + mod_dz - recess_depth / 2 + 0.01))):
+            bd.Box(mod_dx - 2.0, mod_dy - 2.0, recess_depth + 0.02,
+                   mode=bd.Mode.SUBTRACT)
+    add(parts, _can.part, SHIELD_TIN, "ESP_WROOM32")
 
-    # --- Micro-USB 接口 (-X 短邊, 突出邊緣 ~0.5mm) ---
+    # --- 天線殘段 (antenna stub poking off +X edge of the can, PCB/white) ---
+    # Mirror SSOT Antenna-Area dims: w_mm=2.5 (X) × h_mm=7.0 (Y). The trace
+    # antenna sits at the very +X tip of the module, just past the metal can.
+    ant_dx, ant_dy, ant_dz = 2.5, 7.0, 0.8
+    can_x_max = mod_cx + mod_dx / 2
+    ant_cx = can_x_max + ant_dx / 2 + 0.1     # poke off the can's +X face
+    add(parts, box(ant_cx, 0.0, pz + ant_dz / 2,
+                   ant_dx, ant_dy, ant_dz),
+        WHITE, "Antenna_Stub")
+
+    # --- Micro-USB 接口 (-X 短邊, 突出邊緣 ~0.5mm, 開孔成插口) ---
     # Real connector: 7.5 wide (Y) × 5.9 long (X) × 2.6 tall.
+    # Hollow the -X face so it reads as a connector mouth, not a solid brick.
     usb_dx, usb_dy, usb_dz = 5.9, 7.5, 2.6
     usb_cx = -L / 2 + usb_dx / 2 - 0.5       # 0.5mm overhang on -X
-    add(parts, box(usb_cx, 0.0, pz + usb_dz / 2,
-                   usb_dx, usb_dy, usb_dz),
-        USB_SILVER, "MicroUSB")
+    mouth_depth = usb_dx - 1.2               # leave ~1.2mm back wall
+    with bd.BuildPart() as _usb:
+        with bd.Locations(bd.Location((usb_cx, 0.0, pz + usb_dz / 2))):
+            bd.Box(usb_dx, usb_dy, usb_dz)
+        # cut the slot mouth from the -X face (smaller than the shell)
+        face_x = usb_cx - usb_dx / 2
+        with bd.Locations(bd.Location(
+                (face_x + mouth_depth / 2 - 0.01, 0.0, pz + usb_dz / 2))):
+            bd.Box(mouth_depth + 0.02, usb_dy - 1.4, usb_dz - 1.2,
+                   mode=bd.Mode.SUBTRACT)
+    add(parts, _usb.part, USB_SILVER, "MicroUSB")
 
     # --- 2×15 排針, 沿 X 軸跑, 兩列在 y=±11.4 (對齊 PCBSpec) ---
+    # SSOT extra_ports LEFT/RIGHT_HDR: pitch 2.54. Keep add_pin_header (black
+    # plastic strip + gold receptacle pins) AND add a square BLACK post per pin
+    # on top so the header reads as discrete pins, not a flat strip.
     pitch = 2.54
     n_pins = 15
+    post_w, post_h = 0.64, 3.0                # square pin shank
     # PCBSpec: pin 0 (EN) at x_local=1.3 → centred x = -L/2 + 1.3 = -25.7+1.3 = -24.4
     x_start = -L / 2 + 1.3
     for side, sy in [("L", -11.4), ("R", 11.4)]:
         pins = [(x_start + i * pitch, sy) for i in range(n_pins)]
         add_pin_header(parts, pz, pins, f"Header_{side}",
                        pitch=pitch, plastic_h=2.54, is_male=True)
+        # per-pin square black posts standing above the plastic strip
+        for px, py in pins:
+            add(parts, box(px, py, pz + 2.54 + post_h / 2,
+                           post_w, post_w, post_h),
+                BLACK, f"Post_{side}")
 
     # --- EN / BOOT 按鍵 (USB 端, -X side, 在兩排 header 中間) ---
     btn_dx, btn_dy, btn_dz = 2.5, 3.3, 1.5
@@ -78,16 +115,53 @@ def build_esp32_pcb_body() -> bd.Compound:
                        btn_dx, btn_dy, btn_dz),
             BLACK, f"Btn_{lbl}")
 
-    # --- CP2102 USB-UART IC (5×5×0.9 QFN, 介於 USB 與 WROOM 之間) ---
-    add_smd_ic(parts, -L / 2 + 12.0, 0.0, pz, 5.0, 5.0, 0.9, "CP2102")
+    # --- CP2102 USB-UART IC (QFP, SSOT ic-qfp pins=28 bodyW=4.9 bodyD=3.9) ---
+    # Keep add_smd_ic for the dark IC body + pin1 dot, then add 4 thin gold
+    # lead rows around the perimeter so it reads as a leaded QFP, not a QFN pad.
+    cp_cx, cp_cy = -L / 2 + 12.0, 0.0
+    cp_bw, cp_bd, cp_bh = 4.9, 3.9, 0.9
+    add_smd_ic(parts, cp_cx, cp_cy, pz, cp_bw, cp_bd, cp_bh, "CP2102")
+    lead_pitch = 0.65
+    lead_len, lead_t, lead_h = 0.45, 0.3, 0.2
+    n_side_x = 7                              # 7+7+7+7 = 28 leads
+    n_side_y = 7
+    lead_z = pz + lead_h / 2
+    # leads on ±Y faces (run along X)
+    for i in range(n_side_x):
+        lx = cp_cx + (i - (n_side_x - 1) / 2) * lead_pitch
+        for sy in (cp_cy + cp_bd / 2 + lead_len / 2,
+                   cp_cy - cp_bd / 2 - lead_len / 2):
+            add(parts, box(lx, sy, lead_z, lead_t, lead_len, lead_h),
+                PIN_GOLD, "CP2102_Lead")
+    # leads on ±X faces (run along Y)
+    for i in range(n_side_y):
+        ly = cp_cy + (i - (n_side_y - 1) / 2) * lead_pitch
+        for sx in (cp_cx + cp_bw / 2 + lead_len / 2,
+                   cp_cx - cp_bw / 2 - lead_len / 2):
+            add(parts, box(sx, ly, lead_z, lead_len, lead_t, lead_h),
+                PIN_GOLD, "CP2102_Lead")
 
-    # --- AMS1117 穩壓器 (3 long × 4 wide × 1.5 tall SOT-223) ---
-    add(parts, box(-L / 2 + 18.0, 5.0, pz + 0.75, 3.0, 4.0, 1.5),
+    # --- AMS1117 穩壓器 (SOT-223: dark body + large metal heat tab) ---
+    ams_cx, ams_cy = -L / 2 + 18.0, 5.0
+    ams_dx, ams_dy, ams_dz = 3.0, 4.0, 1.5
+    add(parts, box(ams_cx, ams_cy, pz + ams_dz / 2,
+                   ams_dx, ams_dy, ams_dz),
         IC_DARK, "AMS1117")
+    # SOT-223 exposed metal tab on the -X side (solder pad / heatsink)
+    tab_dx, tab_dy, tab_dz = 1.0, ams_dy - 0.6, 0.25
+    add(parts, box(ams_cx - ams_dx / 2 - tab_dx / 2 + 0.1, ams_cy,
+                   pz + tab_dz / 2, tab_dx, tab_dy, tab_dz),
+        METAL_DARK, "AMS1117_Tab")
 
     # --- LED (PWR / USER) — USB 端 + WROOM 旁 ---
-    add_led(parts, -L / 2 + 4.0, -3.0, pz, LED_RED,  "PWR_LED")
-    add_led(parts, -L / 2 + 4.0,  3.0, pz, LED_BLUE, "USER_LED")
+    # Keep add_led for the coloured SMD body, then cap each with a small
+    # DOME_WHITE translucent lens so it reads as an emitter, not a flat chip.
+    led_body_h = 0.8                          # matches add_led box height
+    for lx, ly, lc, lbl in [(-L / 2 + 4.0, -3.0, LED_RED, "PWR_LED"),
+                            (-L / 2 + 4.0, 3.0, LED_BLUE, "USER_LED")]:
+        add_led(parts, lx, ly, pz, lc, lbl)
+        add(parts, cyl(lx, ly, pz + led_body_h + 0.15, 0.45, 0.3),
+            DOME_WHITE, f"{lbl}_Lens")
 
     # --- 絲印標籤 (沿長邊放, 不再橫向占滿) ---
     add(parts, box(-L / 2 + 10.0, -8.0, pz + 0.02, 14.0, 2.0, 0.04),

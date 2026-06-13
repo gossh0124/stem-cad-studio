@@ -65,6 +65,34 @@ def test_servo_wheel_error():
 
 
 # ---------------------------------------------------------------------------
+# (a2) Servo + 雙足步行 → CAP-001 negative-guard，不誤判 error
+# 伺服做「關節角度控制」是正確用途（非驅動輪）；exclude_patterns 排除足式步行。
+# ---------------------------------------------------------------------------
+
+_BRIDGE_BIPED = {
+    "project_name": "雙足機器人",
+    "project_category": "robot",
+    "_instruction": "用四個伺服馬達做會走路的雙足機器人，前進後退",
+    "components": [
+        {"role": "mcu", "type": "Arduino-Uno-class", "qty": 1,
+         "spec": {"voltage_v": 5.0, "current_ma": 50.0}},
+        {"role": "actuator", "type": "Motor-Servo-class", "qty": 4,
+         "spec": {"voltage_v": 5.0, "current_ma": 150.0}},
+        {"role": "power", "type": "Battery-AA-class", "qty": 1,
+         "spec": {"voltage_v": 3.0, "current_ma": None}},
+    ],
+}
+
+
+def test_servo_biped_no_false_positive():
+    """CAP-001 exclude_patterns：雙足步行用伺服做關節控制，不應誤判為 servo error。"""
+    issues = check_feasibility(_BRIDGE_BIPED)
+    servo_errors = [i for i in issues
+                    if i["severity"] == "error" and "Motor-Servo" in i.get("component", "")]
+    assert len(servo_errors) == 0, f"雙足步行不應觸發 CAP-001 servo error，實際：{servo_errors}"
+
+
+# ---------------------------------------------------------------------------
 # (b) RaspberryPi + Battery-AA + 省電一個月 → ≥1 能量 error + runtime_hours
 # ---------------------------------------------------------------------------
 

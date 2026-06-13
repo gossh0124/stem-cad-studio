@@ -5,10 +5,11 @@
       "voltage_v": "electrical.voltage_operating_v|voltage_output_v|output_voltage_v|voltage_nominal_v",
       "weight_g": "physical.weight_with_batteries_g|weight_g",
       "thermal_mw": "electrical.thermal_mw",
-      "power_ma": "electrical.current_typ_ma"
+      "power_ma": "electrical.current_typ_ma",
+      "supply_ma": "electrical.output_current_max_ma|max_continuous_ma",
+      "supply_v": "voltage of power-source classes (those with a supply current field)"
     },
-    "generated": "2026-05-29",
-    "note": "Regenerate with: python -c \"from lib.specs import _rebuild_specs_cache; _rebuild_specs_cache()\""
+    "note": "Regenerate: python -c \"from lib.specs import _rebuild_specs_cache; _rebuild_specs_cache()\""
   },
   "_fallback": {
     "voltage_v": {
@@ -17,11 +18,14 @@
       "Chassis-Car-class": 5.0
     },
     "weight_g": {},
-    "thermal_mw": {},
+    "thermal_mw": {
+      "Arduino-Nano-class": 150.0
+    },
     "power_ma": {
       "Arduino-Nano-class": 19.0,
       "ESP8266-class": 170.0,
       "Battery-AA-class": 0.0,
+      "Battery-4AA-class": 0.0,
       "Battery-LiPo-class": 0.0,
       "Switch-class": 0.0,
       "Switch-Generic-class": 0.0,
@@ -30,14 +34,31 @@
       "Lighting-LED-Strip-class": 200.0,
       "AC-Adapter-class": 0.0,
       "USB-Adapter-class": 0.0,
+      "USB-Buck-5V-class": 0.0,
+      "LiPo-Charger-class": 0.0,
+      "BatteryHolder-AA-class": 0.0,
       "Chassis-Car-class": 0.0,
       "Display-EInk-class": 15.0
+    },
+    "supply_ma": {
+      "_note": "Power-source classes absent from verified.json (alias variants). Values from research workflow wu8s48d11 (3-source + adversarial verify): USB-Buck-5V = MP1584/LM2596 module safe-continuous 1500mA (2A is short-term peak, not continuous); LiPo-Charger = TP4056 1A charge rating = 1000mA; BatteryHolder-AA = same AA chemistry as Battery-AA SSOT (800mA). Promote to verified.json electrical when full SSOT entries are added.",
+      "BatteryHolder-AA-class": 800.0,
+      "LiPo-Charger-class": 1000.0,
+      "USB-Buck-5V-class": 1500.0
+    },
+    "supply_v": {
+      "_note": "Voltage of alias-variant power sources absent from verified.json (see supply_ma _note). USB-Buck-5V = 5.0V output; LiPo-Charger = 3.7V (LiPo nominal); BatteryHolder-AA = 3.0V (2xAA series, same as Battery-AA).",
+      "BatteryHolder-AA-class": 3.0,
+      "LiPo-Charger-class": 3.7,
+      "USB-Buck-5V-class": 5.0
     },
     "_comment": "Values for classes absent from verified.json or lacking the field. Hand-maintained; preserved across _rebuild_specs_cache()."
   },
   "voltage_v": {
     "AC-Adapter-class": 5.0,
+    "Arduino-Nano-class": 5.0,
     "Arduino-Uno-class": 5.0,
+    "Battery-4AA-class": 6.0,
     "Battery-AA-class": 3.0,
     "Battery-LiPo-class": 3.7,
     "Button-class": 5.0,
@@ -80,7 +101,9 @@
   },
   "weight_g": {
     "AC-Adapter-class": 40.0,
+    "Arduino-Nano-class": 7.0,
     "Arduino-Uno-class": 25.0,
+    "Battery-4AA-class": 13.4,
     "Battery-AA-class": 56.0,
     "Battery-LiPo-class": 22.0,
     "Button-class": 1.5,
@@ -126,6 +149,7 @@
   "thermal_mw": {
     "AC-Adapter-class": 500.0,
     "Arduino-Uno-class": 250.0,
+    "Battery-4AA-class": 0.0,
     "Battery-AA-class": 0.0,
     "Battery-LiPo-class": 0.0,
     "Button-class": 0.0,
@@ -201,5 +225,21 @@
     "Sensor-Ultrasonic-class": 15.0,
     "Speaker-class": 200.0,
     "USB-5V-class": 0.0
+  },
+  "supply_ma": {
+    "AC-Adapter-class": 2000.0,
+    "Battery-4AA-class": 1500.0,
+    "Battery-AA-class": 800.0,
+    "Battery-LiPo-class": 1500.0,
+    "USB-5V-class": 500.0,
+    "USB-Adapter-class": 1000.0
+  },
+  "supply_v": {
+    "AC-Adapter-class": 5.0,
+    "Battery-4AA-class": 6.0,
+    "Battery-AA-class": 3.0,
+    "Battery-LiPo-class": 3.7,
+    "USB-5V-class": 5.0,
+    "USB-Adapter-class": 5.0
   }
 }

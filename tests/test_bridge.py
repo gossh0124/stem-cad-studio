@@ -30,10 +30,12 @@ class TestBuildBom:
         assert bom[0]["price_twd"] == 90  # Sensor-TempHumid-class price
 
     def test_bom_unknown_type(self):
+        # No-Silent-Fallback: a resolved component class that is missing from the
+        # price SSOT (lib/specs.py PRICE_NTD) must raise rather than be silently
+        # priced at 0 TWD, so SSOT drift is loud instead of hidden.
         components = [{"selected_type": "Unknown-class", "role": "X"}]
-        bom = build_bom(components)
-        assert bom[0]["price_twd"] == 0
-        assert bom[0]["url"] == ""
+        with pytest.raises(KeyError, match="price SSOT"):
+            build_bom(components)
 
     def test_empty_components(self):
         assert build_bom([]) == []

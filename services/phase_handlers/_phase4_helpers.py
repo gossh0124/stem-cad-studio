@@ -166,7 +166,7 @@ def run_contract_validation(
 ) -> None:
     """執行 VS-IC contract validation（advisory，不 block pipeline）。
 
-    驗證 bridge.cad_output.component_placements 介接契約，結果寫入
+    驗證 bridge.cad_output.scene_graph_v3.modules 介接契約，結果寫入
     bridge["cad_validation"]。失敗只 warning，不拋例外。
     """
     try:

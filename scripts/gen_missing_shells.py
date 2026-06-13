@@ -6,6 +6,7 @@ Run: .venv/Scripts/python.exe scripts/gen_missing_shells.py
 from __future__ import annotations
 
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -22,26 +23,41 @@ except ImportError as exc:
     sys.exit(f"build123d import failed: {exc}")
 
 
+def _stl_triangle_count(stl_path: Path) -> int:
+    """Read the real triangle count from an STL file.
+
+    Binary STL: 80-byte header followed by a uint32 (little-endian) triangle
+    count at byte offset 80. ASCII STL: count "facet normal" occurrences.
+    Avoids the old file-size//50 heuristic which mis-counted the 84-byte
+    header and was entirely wrong for ASCII output.
+    """
+    with open(stl_path, "rb") as fh:
+        head = fh.read(84)
+        # ASCII STL files start with the literal token "solid" and have no
+        # valid uint32 count; detect and fall back to facet counting.
+        if head[:5].lower() == b"solid" and b"facet" in head:
+            text = stl_path.read_text(encoding="ascii", errors="replace")
+            return text.count("facet normal")
+        if len(head) < 84:
+            raise ValueError(f"STL too short to contain a header+count: {stl_path}")
+        return struct.unpack("<I", head[80:84])[0]
+
+
 def _save(name: str, part, label: str, kind: str = "pcb_body"):
     d = SHELLS / name
     d.mkdir(parents=True, exist_ok=True)
     stl_path = d / "pcb_body.stl"
     export_stl(part, str(stl_path))
-    tris = stl_path.stat().st_size // 50  # rough estimate
+    tris = _stl_triangle_count(stl_path)
     meta = {"class_name": name, "kind": kind, "label": label, "tris": tris,
             "files": {"pcb_body_stl": "pcb_body.stl"}}
     (d / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"  [OK] {name:30s} -> {stl_path.stat().st_size:>8,} bytes  ({tris} tris)")
 
 
-def gen_battery_aa():
-    """AA battery holder: rectangular box with 2 cylindrical cavities on top."""
-    with BuildPart() as p:
-        Box(58, 32, 16)
-        # Cut cylinders from above — centered at z=5 so they span z=−1..11 (overlap top z=8)
-        with Locations([(12, 0, 5), (-12, 0, 5)]):
-            Cylinder(7.2, 12, mode=Mode.SUBTRACT)
-    _save("Battery-AA-class", p.part, "AA Battery Holder")
+# NOTE: gen_battery_aa removed 2026-06-06 — it produced a single-colour Box+2-holes
+# placeholder (user feedback: 同色長方體+頂面兩洞). Battery-AA is now baked as a
+# multi-colour body by lib/cad/component_bodies.gen_battery_aa (via export_pcb).
 
 
 def gen_battery_lipo():
@@ -189,21 +205,14 @@ def gen_ac_adapter():
     _save("AC-Adapter-class", p.part, "AC Adapter")
 
 
-_GENERATORS = [
-    gen_battery_aa,
-    gen_battery_lipo,
-    gen_button,
-    gen_buzzer_active,
-    gen_buzzer_passive,
-    gen_led_pwm,
-    gen_led_rgb,
-    gen_neopixel,
-    gen_potentiometer,
-    gen_remote,
-    gen_switch,
-    gen_usb_5v,
-    gen_ac_adapter,
-]
+# NOTE 2026-06-06: the single-colour Button/Buzzer/LED/NeoPixel/Potentiometer/Switch/
+# USB-5V/AC-Adapter/Remote generators are SUPERSEDED by multi-colour, datasheet-accurate
+# builders in lib/cad/component_bodies_fidelity.py (Remote was also the WRONG part — NRF24
+# vs the SSOT IR receiver). They stay defined for reference but are no longer baked here.
+# NOTE 2026-06-07: gen_battery_lipo is ALSO superseded — Battery-LiPo-class is now baked
+# as a multi-colour foil-pouch + JST body by lib/cad/component_bodies_fidelity.gen_battery_lipo
+# (via export_pcb). The single-colour Box+tab placeholder here is retired from the bake.
+_GENERATORS: list = []
 
 
 def main():
@@ -219,8 +228,13 @@ def main():
     print(f"\nDone: {ok} OK, {fail} FAIL")
 
     # 後處理：新生成的 base/lid/mount STL 一律補 GLB（assembly 載入更快、demo/live 一致）
+    # 缺少轉換模組屬於環境硬錯誤（hard error），不可降級為 WARN；轉換本身的失敗才當 WARN。
     try:
         from lib.cad.glb_convert import ensure_shell_glbs
+    except ImportError as e:
+        print(f"  [FAIL] GLB 後處理模組缺失（lib.cad.glb_convert）：{e}")
+        raise
+    try:
         res = ensure_shell_glbs(SHELLS)
         print(f"GLB 後處理：轉換 {len(res['converted'])}、跳過 {len(res['skipped'])}")
     except Exception as e:

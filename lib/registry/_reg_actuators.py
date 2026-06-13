@@ -8,7 +8,6 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'Motor-Servo-class': ComponentSpec(
         name='SG90 Micro Servo Motor', class_name='Motor-Servo-class',
         tags=['gpio:pwm', 'actuate:rotation_position'],
-        length_mm=23.0, width_mm=12.2, height_mm=32.0,
         mounting_holes=[MountingHole(x=2.25, y=6.1, diameter=2.0), MountingHole(x=20.75, y=6.1, diameter=2.0)],
         ports=[
             ConnectorPort(name='GND',    port_type='GND',   x=1.50, y=12.2, width=2.54, height=2.54, side='face'),
@@ -20,8 +19,12 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'Motor-DC-class': ComponentSpec(
         name='DC Gear Motor 3-6V', class_name='Motor-DC-class',
         tags=['gpio:pwm', 'actuate:rotation_continuous'],
-        length_mm=70.0, width_mm=22.0, height_mm=18.0,
-        mounting_holes=[MountingHole(x=5.0, y=5.0, diameter=3.0), MountingHole(x=65.0, y=5.0, diameter=3.0)],
+        # B5-coord 2026-06-12: 3 mounting holes extracted from Adafruit 3777 TT-motor
+        # official STEP (Tier-A). Frame: SSOT_x = STEP_Z + 54.6 (can=x0, shaft=x70 per
+        # Shaft port), SSOT_y = STEP_X + 11.2. 2 body holes (x=34) + 1 tab hole at shaft end.
+        mounting_holes=[MountingHole(x=34.0, y=2.4, diameter=3.0),
+                        MountingHole(x=68.6, y=11.2, diameter=3.0),
+                        MountingHole(x=34.0, y=20.0, diameter=3.0)],
         ports=[
             ConnectorPort(name='M+',    port_type='PWR',   x=3.0,  y=22.0, width=4.0, height=3.0, side='face'),
             ConnectorPort(name='M-',    port_type='GND',   x=10.0, y=22.0, width=4.0, height=3.0, side='face'),
@@ -31,7 +34,6 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'Relay-Module-class': ComponentSpec(
         name='5V Single Channel Relay Module', class_name='Relay-Module-class',
         tags=['gpio:digital', 'actuate:switch_load'],
-        length_mm=50.0, width_mm=26.0, height_mm=19.0,
         mounting_holes=[MountingHole(x=2.5, y=2.5, diameter=3.0), MountingHole(x=47.5, y=2.5, diameter=3.0)],
         ports=[
             ConnectorPort(name='VCC', port_type='PWR',   x=2.54,  y=0.0,  width=2.54, height=2.54, side='face'),
@@ -45,7 +47,6 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'Pump-Water-class': ComponentSpec(
         name='Mini Submersible Water Pump 3-5V', class_name='Pump-Water-class',
         tags=['gpio:digital', 'actuate:fluid'],
-        length_mm=45.0, width_mm=30.0, height_mm=25.0,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='VCC',    port_type='PWR',   x=5.0,  y=30.0, width=3.0, height=3.0, side='face'),
@@ -79,7 +80,6 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'L298N-Driver-class': ComponentSpec(
         name='L298N Dual H-Bridge Motor Driver Module', class_name='L298N-Driver-class',
         tags=['gpio:pwm', 'actuate:rotation_continuous'],
-        length_mm=43.0, width_mm=43.0, height_mm=27.0,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='ENA',  port_type='GPIO', x=16.00, y=0.0,  width=2.54, height=2.54, side='face'),
@@ -100,7 +100,6 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'Mist-Atomizer-class': ComponentSpec(
         name='Piezoelectric Mist Atomizer 20mm', class_name='Mist-Atomizer-class',
         tags=['gpio:digital', 'actuate:mist'],
-        length_mm=25.0, width_mm=25.0, height_mm=15.0,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='VCC',  port_type='PWR', x=5.0,  y=0.0, width=2.54, height=2.54, side='face'),
@@ -119,7 +118,6 @@ ACTUATOR_COMPONENTS: dict[str, ComponentSpec] = {
     'Mist-Ultrasonic-class': ComponentSpec(
         name='Ultrasonic Mist Maker Module', class_name='Mist-Ultrasonic-class',
         tags=['gpio:digital', 'actuate:mist'],
-        length_mm=35.0, width_mm=35.0, height_mm=25.0,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='VCC',  port_type='PWR', x=5.0,  y=0.0, width=2.54, height=2.54, side='face'),

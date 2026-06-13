@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from lib.pin_maps import _PIN_MAPS, _INPUT_ONLY_PINS, _I2C_HW_PINS
+from lib.pin_maps import _PIN_MAPS, _INPUT_ONLY_PINS, _I2C_HW_PINS, mcu_pin_prefix, label_mcu_pin, mcu_power_pin
 
 
 class TestPinMapsStructure:
@@ -130,3 +130,82 @@ class TestI2CHwPins:
     def test_tuples_length_2(self):
         for mcu, pair in _I2C_HW_PINS.items():
             assert len(pair) == 2, f"{mcu} I2C pair not length 2"
+
+
+class TestMcuPinPrefix:
+    """mcu_pin_prefix returns correct per-MCU numeric prefix."""
+
+    def test_microbit_prefix(self):
+        assert mcu_pin_prefix("Microbit") == "P"
+
+    def test_rpi_prefix(self):
+        assert mcu_pin_prefix("RPi") == "GP"
+
+    def test_arduino_prefix(self):
+        assert mcu_pin_prefix("Arduino") == "D"
+
+    def test_esp32_prefix(self):
+        assert mcu_pin_prefix("ESP32") == "D"
+
+    def test_unknown_falls_back_to_d(self):
+        assert mcu_pin_prefix("UnknownMCU") == "D"
+
+
+class TestLabelMcuPin:
+    """label_mcu_pin applies prefix to int-like pins only."""
+
+    def test_integer_pin_arduino(self):
+        assert label_mcu_pin("Arduino", 3) == "D3"
+
+    def test_integer_pin_microbit(self):
+        assert label_mcu_pin("Microbit", 0) == "P0"
+
+    def test_integer_pin_rpi(self):
+        assert label_mcu_pin("RPi", 17) == "GP17"
+
+    def test_named_pin_passthrough(self):
+        # "A0" is a named pin — must NOT get a prefix
+        assert label_mcu_pin("Arduino", "A0") == "A0"
+
+    def test_named_pin_a4_passthrough(self):
+        assert label_mcu_pin("Arduino", "A4") == "A4"
+
+    def test_string_integer_arduino(self):
+        # raw_pin may already be a string representation of a number
+        assert label_mcu_pin("Arduino", "5") == "D5"
+
+    def test_string_integer_microbit(self):
+        assert label_mcu_pin("Microbit", "2") == "P2"
+
+    def test_string_integer_rpi(self):
+        assert label_mcu_pin("RPi", "4") == "GP4"
+
+
+class TestMcuPowerPin:
+    """mcu_power_pin maps voltage strings to frontend whitelist rail labels."""
+
+    def test_3v3_arduino(self):
+        assert mcu_power_pin("Arduino", "3.3V") == "3V3"
+
+    def test_3v3_microbit_returns_3v(self):
+        # Microbit 3.3V rail is labelled "3V" in the frontend whitelist
+        assert mcu_power_pin("Microbit", "3.3V") == "3V"
+
+    def test_5v_arduino(self):
+        assert mcu_power_pin("Arduino", "5V") == "5V"
+
+    def test_5v_microbit_stays_5v(self):
+        # Microbit has no 5V rail — keep "5V" so it surfaces as an error
+        assert mcu_power_pin("Microbit", "5V") == "5V"
+
+    def test_3v3_esp32(self):
+        assert mcu_power_pin("ESP32", "3.3V") == "3V3"
+
+    def test_vin_passthrough(self):
+        assert mcu_power_pin("Arduino", "VIN") == "VIN"
+
+    def test_already_canonical_3v3(self):
+        assert mcu_power_pin("Arduino", "3V3") == "3V3"
+
+    def test_already_canonical_3v_microbit(self):
+        assert mcu_power_pin("Microbit", "3V") == "3V"

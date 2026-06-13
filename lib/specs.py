@@ -23,6 +23,12 @@ _SPECS_CACHE: dict | None = None
 # verified.json field resolution per section (first match wins for voltage)
 _VOLTAGE_KEYS = ("voltage_operating_v", "voltage_output_v", "output_voltage_v", "voltage_nominal_v")
 
+# 電源供電容量讀穿欄位（safe continuous OUTPUT capacity, mA）。電源 class 欄名歷史不一：
+# adapter 用 output_current_max_ma、電池/USB 模組用 max_continuous_ma。兩者皆為電源專屬
+# （無 active 元件使用此二欄），故 derive 出的 supply_ma section 恰含電源 class。不納入
+# current_max_ma（active 元件的耗電上限，語意不同，會污染）。第一個命中者勝。
+_SUPPLY_CURRENT_KEYS = ("output_current_max_ma", "max_continuous_ma")
+
 
 def _load_specs_cache() -> dict:
     """Load the raw combined cache dict (lazy, thread-safe, double-checked)."""
@@ -62,6 +68,8 @@ def _derive_specs_from_verified() -> Dict[str, Dict[str, float]]:
     weight: Dict[str, float] = {}
     thermal: Dict[str, float] = {}
     power: Dict[str, float] = {}
+    supply: Dict[str, float] = {}
+    supply_v: Dict[str, float] = {}
     for cls in (c for c in vj if not c.startswith("_")):
         elec = vj[cls].get("electrical", {})
         phys = vj[cls].get("physical", {})
@@ -78,7 +86,16 @@ def _derive_specs_from_verified() -> Dict[str, Dict[str, float]]:
             thermal[cls] = float(elec["thermal_mw"])
         if "current_typ_ma" in elec:
             power[cls] = float(elec["current_typ_ma"])
-    return {"voltage_v": voltage, "weight_g": weight, "thermal_mw": thermal, "power_ma": power}
+        # supply OUTPUT capacity (power sources only carry _SUPPLY_CURRENT_KEYS fields);
+        # supply_v = that same power source's nominal/output voltage (讀穿,非另立電壓手 dict)
+        for key in _SUPPLY_CURRENT_KEYS:
+            if key in elec:
+                supply[cls] = float(elec[key])
+                if cls in voltage:
+                    supply_v[cls] = voltage[cls]
+                break
+    return {"voltage_v": voltage, "weight_g": weight, "thermal_mw": thermal,
+            "power_ma": power, "supply_ma": supply, "supply_v": supply_v}
 
 
 def _rebuild_specs_cache(write: bool = True) -> dict:
@@ -101,6 +118,8 @@ def _rebuild_specs_cache(write: bool = True) -> dict:
                 "weight_g": "physical.weight_with_batteries_g|weight_g",
                 "thermal_mw": "electrical.thermal_mw",
                 "power_ma": "electrical.current_typ_ma",
+                "supply_ma": "electrical." + "|".join(_SUPPLY_CURRENT_KEYS),
+                "supply_v": "voltage of power-source classes (those with a supply current field)",
             },
             "note": 'Regenerate: python -c "from lib.specs import _rebuild_specs_cache; _rebuild_specs_cache()"',
         },
@@ -109,6 +128,8 @@ def _rebuild_specs_cache(write: bool = True) -> dict:
         "weight_g": dict(sorted(derived["weight_g"].items())),
         "thermal_mw": dict(sorted(derived["thermal_mw"].items())),
         "power_ma": dict(sorted(derived["power_ma"].items())),
+        "supply_ma": dict(sorted(derived["supply_ma"].items())),
+        "supply_v": dict(sorted(derived["supply_v"].items())),
     }
     if write:
         global _SPECS_CACHE
@@ -128,7 +149,7 @@ PRICE_NTD: Dict[str, int] = {
     "ESP32-class": 180,         "ESP8266-class": 120,
     "RaspberryPi-class": 1500,  "Microbit-class": 650,
     "USB-5V-class": 80,         "Battery-LiPo-class": 60,
-    "Battery-AA-class": 40,
+    "Battery-AA-class": 40,     "Battery-4AA-class": 60,
     "Sensor-TempHumid-class": 90,   "Sensor-Ultrasonic-class": 50,
     "Sensor-PIR-class": 70,         "Sensor-SoilMoisture-class": 40,
     "Sensor-Light-class": 20,       "Sensor-MSGEQ7-class": 45,
@@ -157,29 +178,27 @@ PRICE_NTD: Dict[str, int] = {
 VOLTAGE_V: Dict[str, float] = _section("voltage_v")
 
 # ── 供電電壓 (V) ──────────────────────────────────────────
-SUPPLY_V: Dict[str, float] = {
-    "USB-5V-class":       5.0,
-    "Battery-LiPo-class": 3.7,
-    "Battery-AA-class":   3.0,
-    "AC-Adapter-class":   5.0,
-    "USB-Adapter-class":  5.0,
-    "USB-Buck-5V-class":      5.0,
-    "LiPo-Charger-class":     3.7,
-    "BatteryHolder-AA-class":  3.0,
-}
+# 讀穿 verified.json:in-SSOT 電源 class 取其「與供電容量同源」的官方電壓（_section("supply_v")
+# = 該電源 nominal/output 電壓，與 VOLTAGE_V 同一讀穿源、不另立電壓手 dict）；verified.json 缺項的
+# alias variant（USB-Buck/LiPo-Charger/BatteryHolder-AA）取 _fallback.supply_v（附 provenance）。
+# 先前為手刻字典（與 verified.json 電壓重複）→ 改讀穿消除額外建制（B1，同 #20 supply_ma 模式）。
+# 漂移防護見 tests/test_specs.py::TestSupplyV。
+SUPPLY_V: Dict[str, float] = _section("supply_v")
 
 # ── 電流預算 ──────────────────────────────────────────────
 USB_BUDGET_MA: float = 500.0
 RAIL_3V3_BUDGET_MA: float = 50.0
 THERMAL_THRESHOLD_MW: float = 2000.0
 
-POWER_BUDGET_MA: Dict[str, float] = {
-    "USB-5V-class":       500.0,
-    "USB-Adapter-class":  500.0,
-    "Battery-LiPo-class": 1500.0,
-    "Battery-AA-class":   800.0,
-    "AC-Adapter-class":   2000.0,
-}
+# 電源供電上限（safe continuous output capacity, mA）。讀穿 verified.json 供電容量欄
+# （_SUPPLY_CURRENT_KEYS，經 _section("supply_ma")）:in-SSOT 電源 class 取官方 3 源真值
+# （USB-5V 500 / USB-Adapter 1000 / AC 2000 / Battery-AA 800 / Battery-LiPo 1500=1.5C×1000mAh）；
+# verified.json 缺項（USB-Buck/LiPo-Charger/BatteryHolder-AA 等 alias variant）取 cache
+# _fallback.supply_ma（附 provenance）。先前為手刻字典且與 phase2._SUPPLY_MA / bake._SUPPLY
+# 三源漂移（USB-Adapter 500↔1000、USB-5V 500↔1000、LiPo 1500↔1000），造成 Phase 2 早期警示
+# 比 Phase 3 BOM 寬鬆 = 假性放行（#20）→ 改讀穿單一官方源消除。缺值由消費端 USB_BUDGET_MA 收尾。
+# 漂移防護見 tests/test_power_budget_single_source.py。改值改 verified.json 後跑 _rebuild_specs_cache()。
+POWER_BUDGET_MA: Dict[str, float] = _section("supply_ma")
 
 STALL_MA: Dict[str, float] = {
     "Motor-Servo-class":        500.0,
@@ -201,6 +220,7 @@ BOM_URLS: Dict[str, str] = {
     "USB-5V-class":         "https://www.lcsc.com/search?q=usb+5v+adapter",
     "Battery-LiPo-class":   "https://www.lcsc.com/search?q=lipo+battery+3.7v+tp4056",
     "Battery-AA-class":     "https://www.lcsc.com/search?q=aa+battery+holder",
+    "Battery-4AA-class":    "https://www.lcsc.com/search?q=4xaa+battery+holder+wire+leads",
     "Sensor-TempHumid-class":    "https://www.lcsc.com/search?q=dht22",
     "Sensor-Ultrasonic-class":   "https://www.lcsc.com/search?q=hc-sr04",
     "Sensor-PIR-class":          "https://www.lcsc.com/search?q=pir+motion+sensor",
@@ -271,9 +291,15 @@ COMPONENT_NAME_ALIASES: Dict[str, str] = {
     "Display-Matrix-class":      "LED-Matrix-class",
     "Mist-class":                "Mist-Atomizer-class",
     # ── 原 bridge.py _BRIDGE_ALIAS_MAPPING 搬入 ──
-    "Switch-Generic-class":      "Button-class",
-    "USB-Adapter-class":         "USB-5V-class",
-    "AC-Adapter-class":          "USB-5V-class",
+    # Switch-Generic 為撥動式 SPDT 開關（維持開/關），語意=Switch 非 Button；
+    # 其自身規格(weight 3.0g/price 15) 符 Switch-class，故 canonical 對齊 Switch-class
+    # （與 routes_design._ALIAS 一致，修正舊 bridge 誤映 Button 導致 BOM price/url 偏差）
+    "Switch-Generic-class":      "Switch-class",
+    # NOTE: USB-Adapter-class / AC-Adapter-class are NOT aliased to USB-5V-class.
+    # They are electrically distinct (own POWER_BUDGET_MA: AC=2000mA vs USB-5V=500mA)
+    # and carry their own PRICE_NTD / BOM_URLS / SUPPLY_V rows. Aliasing them caused
+    # resolve_component_alias() to collapse them to USB-5V (BOM price/url divergence
+    # from direct-table lookups — an SSOT split). Keep them as their own canonical names.
     "Sensor-Temperature-class":  "Sensor-TempHumid-class",
     "Display-LCD-I2C-class":     "Display-LCD-class",
     "Display-OLED-SSD1306-class": "Display-OLED-class",

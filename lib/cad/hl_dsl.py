@@ -310,6 +310,10 @@ def _lookup_component_dims(component_type: str, bridge: dict) -> tuple[float, fl
     """從 registry 查 L/W/H；找不到 raise ValueError（呼叫端補 elem_id context 後 re-raise）。"""
     try:
         from lib.registry import COMPONENT_REGISTRY  # noqa: WPS433
+    except ImportError:
+        # registry 為選用相依：缺席時退到 bridge dim hint。其他錯誤不在此吞掉。
+        COMPONENT_REGISTRY = None
+    if COMPONENT_REGISTRY is not None:
         spec = COMPONENT_REGISTRY.get(component_type)
         if spec is not None:
             return (
@@ -317,15 +321,28 @@ def _lookup_component_dims(component_type: str, bridge: dict) -> tuple[float, fl
                 float(getattr(spec, "width_mm", 20.0)),
                 float(getattr(spec, "height_mm", 10.0)),
             )
-    except Exception as exc:
-        _log.debug("COMPONENT_REGISTRY lookup failed for %s: %s", component_type, exc)
     # 二次查源：bridge.components[] 自帶 dim hint
     for comp in (bridge or {}).get("components", []) or []:
         if comp.get("type") == component_type or comp.get("class_name") == component_type:
+            def _dim(*keys: str) -> float:
+                for key in keys:
+                    val = comp.get(key)
+                    if val is not None:
+                        dim = float(val)
+                        if dim <= 0:
+                            raise ValueError(
+                                f"bridge component {component_type!r} has non-positive "
+                                f"dimension {key}={val}"
+                            )
+                        return dim
+                raise ValueError(
+                    f"bridge component {component_type!r} missing dimension (tried {keys})"
+                )
+
             return (
-                float(comp.get("length_mm") or comp.get("L") or 20.0),
-                float(comp.get("width_mm") or comp.get("W") or 20.0),
-                float(comp.get("height_mm") or comp.get("H") or 10.0),
+                _dim("length_mm", "L"),
+                _dim("width_mm", "W"),
+                _dim("height_mm", "H"),
             )
     raise ValueError(f"component_type not found in registry or bridge dims: {component_type!r}")
 

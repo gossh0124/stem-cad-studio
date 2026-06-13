@@ -1,0 +1,36 @@
+{
+  "_doc": "DEC-H7 provenance baseline — load-bearing 路徑上『無依據手填 / estimate-wip』的已知 loci。provenance_lint 凍結此集合:不得擴大(entry 數)、不得擴散(出現在未宣告的檔)。隨 purge 進度漸縮(移除 locus → lint 提示更新此檔)。每 locus 附 purge_plan 指向計劃書階段。",
+  "_invariant": "DEC-H7:render/wiring/verification 消費的每個值須可溯回 3 源 datasheet 或純 derivation;此檔列出尚未達標而暫被容忍者(凍結+漸縮)。",
+  "scan_globs": ["v6/**/*.js", "v6/**/*.jsx"],
+  "handfill_loci": [
+    {
+      "id": "COMP_RENDERERS",
+      "file": "v6/schematic/port-resolver.js",
+      "symbol": "COMP_RENDERERS",
+      "kind": "handfill-no-source",
+      "detect": "const COMP_RENDERERS = {",
+      "allowed_files": ["v6/schematic/port-resolver.js"],
+      "purge_plan": "P4.1/P4.2 — 2D footprint lib(resource-driven shapes-2d.js)取代;prevention gate test_no_handcoded_when_class_data_exists",
+      "note": "24 手刻 stylized glyph;class 有 COMPONENT_DIMENSIONS.ports 時應走 resource-driven,glyph 僅 fallback"
+    },
+    {
+      "id": "dims-legacy-vs-axis",
+      "file": "v6/data/component-dimensions.js",
+      "symbol": "暫保留手填",
+      "kind": "handfill-no-source",
+      "detect": "暫保留手填",
+      "allowed_files": ["v6/data/component-dimensions.js"],
+      "purge_plan": "P0.5/P4 — VS-AXIS 前端邊緣 header 方向慣例改 derived(見 problem.md VS-PCB)",
+      "note": "component-dimensions.js Legacy 段,前端邊緣 header 方向慣例手填"
+    }
+  ],
+  "estimate_wip": [
+    {
+      "id": "ESP32-caliper-pending",
+      "class": "ESP32-DevKit-class",
+      "kind": "estimate-wip",
+      "reason": "DOIT 寬版無官方 Gerber;IC/port 座標為估計值(已去重疊但未 caliper 量測,E6)",
+      "purge_plan": "P6/E6 — 取得實物 caliper 量測後轉 3 源 verified;在 SSOT 標 provenance:estimate-wip,render 標 [WARN] badge(DEC-T8)"
+    }
+  ]
+}

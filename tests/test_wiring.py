@@ -425,11 +425,13 @@ class TestPassives:
         passive = self._pin(w, "TempHumid", "DATA")["passive"]
         assert passive == {"kind": "R", "value": "4.7kΩ", "topo": "pullup"}
 
-    def test_ldr_divider_resistor(self):
-        """LDR 帶 10kΩ 分壓電阻。"""
+    def test_ldr_no_external_divider(self):
+        """LDR 光敏電阻模組：GL5528 載板已板載分壓（CCR3），無外接分壓電阻。"""
         w = resolve_wiring("Arduino", ["Light"])
         passive = self._pin(w, "Light", "LDR")["passive"]
-        assert passive["topo"] == "divider" and passive["value"] == "10kΩ"
+        assert passive is None, (
+            "CCR3: GL5528 carrier 分壓已板載，不應出現外接 divider passive"
+        )
 
     def test_non_passive_pin_is_none(self):
         """無被動元件的訊號腳 passive=None（PIR OUT 直連）。"""

@@ -143,6 +143,13 @@ def check_netlist(wiring: dict, *, validate_issues: list | None = None,
     wiring = wiring or {}
     non_data = _get_non_data()
 
+    # 0. SSOT 完整性:no-silent-fallback。SSOT 載不到時,衝突/短路檢查退回
+    #    硬編 fallback 白名單(非權威 datasheet),須在報告中明示而非僅 log。
+    if _load_ssot_data() is None:
+        rpt.add(CheckResult("L1", "ssot_available", Verdict.FAIL,
+                            message="SSOT datasheet 無法載入,pin 衝突/短路檢查退回 fallback 白名單(非權威)",
+                            metric={"ssot_path": str(_SSOT_PATH)}))
+
     # 1. 連通性：每元件至少有接線
     isolated = [c for c, info in wiring.items() if not (info or {}).get("pins")]
     if isolated:
@@ -344,6 +351,7 @@ def check_wiring_netlist(brain: str, comps: list, *, name: str | None = None) ->
     cn = normalize_comps(comps)
     wiring = resolve_wiring(bk, cn)
     # 標註 passive(refdes/location/nets) 使被動 DRC 可驗（resolve_wiring 本身不標註）
+    passive_annotation_exc: Exception | None = None
     try:
         from lib.wiring.passives import annotate_passives
         comp_classes = {
@@ -351,16 +359,40 @@ def check_wiring_netlist(brain: str, comps: list, *, name: str | None = None) ->
             for c in comps
         }
         annotate_passives(wiring, [], comp_classes)
-    except Exception:  # noqa: BLE001 — fail-open，標註失敗不擋既有檢查
-        pass
+    except Exception as exc:  # noqa: BLE001 — 標註失敗不擋既有檢查,但須明示被動 DRC 未真正驗證
+        passive_annotation_exc = exc
+    label = name or f"{bk}+{len(cn)}comps"
+    # direction/電壓域驗證:不可 fail-open。validate_wiring 崩潰時,把
+    # pin_direction_compat 當作「無法驗證」→ L1 FAIL,而非用 [] 偽裝成「已驗證、零錯誤」。
+    validate_failed_exc: Exception | None = None
     try:
         issues = validate_wiring(brain, comps)
-    except Exception:  # noqa: BLE001 — direction 驗證失敗不應擋住其他檢查
-        issues = []
-    label = name or f"{bk}+{len(cn)}comps"
+    except Exception as exc:  # noqa: BLE001 — 記錄崩潰,改以 FAIL 呈現,不靜默轉成空清單
+        issues = None
+        validate_failed_exc = exc
     rpt = check_netlist(wiring, validate_issues=issues, name=label)
+    if validate_failed_exc is not None:
+        rpt.add(CheckResult("L1", "pin_direction_compat", Verdict.FAIL,
+                            message=f"pin 方向/電壓域驗證無法執行: {validate_failed_exc}",
+                            metric={"error": repr(validate_failed_exc)}))
     # 整合被動 DRC（refdes 唯一 / net 端點 / 零功耗）— 標註後才驗
+    if passive_annotation_exc is not None:
+        # 標註崩潰 → wiring 無 passive dict → 三項 DRC 會空集 PASS,等同未驗證。
+        # 明示為 WARN,避免「保證綠燈」誤導(no-silent-fallback)。
+        rpt.add(CheckResult("L1", "passive_drc_evaluable", Verdict.WARN,
+                            message=f"passive 標註失敗,被動 DRC 未能驗證: {passive_annotation_exc}",
+                            metric={"error": repr(passive_annotation_exc)}))
     rpt.add(passive_refdes_unique(wiring))
     rpt.add(passive_net_endpoints(wiring))
     rpt.add(passive_zero_power(wiring))
+    # Galvanic isolation 契約（P0.2）：聚合進 report —— 避免「碼在卻沒接上」。
+    # 隔離契約無法執行時 fail-closed（L1 FAIL），不靜默略過。
+    try:
+        from lib.wiring import build_netlist
+        from .l1_isolation import check_isolation
+        rpt.extend(check_isolation(build_netlist(bk, wiring)))
+    except Exception as exc:  # noqa: BLE001
+        rpt.add(CheckResult("L1", "isolation_evaluable", Verdict.FAIL,
+                            message=f"galvanic isolation 契約無法執行: {exc}",
+                            metric={"error": repr(exc)}))
     return rpt

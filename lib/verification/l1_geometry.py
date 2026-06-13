@@ -61,3 +61,31 @@ def check_placement_collisions(placements: list, *, name: str | None = None,
         rpt.add(CheckResult("L1", "no_overlap", Verdict.PASS,
                             metric={"n_pairs_checked": n_pairs}))
     return rpt
+
+
+def placements_from_scene_graph(scene_graph: dict) -> list:
+    """Adapt scene_graph_v3 modules → top-down placement dicts for
+    check_placement_collisions.
+
+    scene_graph_v3 is y-up 3D: ``position=[x, y, z]`` is the module CENTER and
+    ``dimensions=[L, W, H]`` are sizes along scene x / z / y respectively (y = up).
+    The footprint plane is therefore x–z, mapped to the checker's x / y axes with
+    corner (not centre) origin. ``component_placements`` (old corner-based x/y/L/W
+    schema) is deprecated; the pipeline now emits scene_graph_v3 only.
+    """
+    out = []
+    for m in scene_graph.get("modules", []):
+        pos = m.get("position") or []
+        dim = m.get("dimensions") or []
+        if len(pos) < 3 or len(dim) < 2:
+            continue
+        L, W = dim[0], dim[1]
+        out.append({
+            "type": m.get("comp_type", "?"),
+            "role": m.get("role", "?"),
+            "x": pos[0] - L / 2.0,
+            "y": pos[2] - W / 2.0,
+            "L": L, "W": W,
+            "enclosure_relation": m.get("enclosure_relation", "internal"),
+        })
+    return out

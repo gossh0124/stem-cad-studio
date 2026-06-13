@@ -1,0 +1,80 @@
+{
+  "demo": "auto_waterer",
+  "skidl_version": "2.2.3",
+  "input_hash": "cdaf8f28d9bbd0a6",
+  "axis_a": {
+    "isolation_pass": true,
+    "logic_gnd_pins": [
+      [
+        "Arduino",
+        "GND"
+      ],
+      [
+        "Relay",
+        "GND"
+      ],
+      [
+        "SoilMoisture",
+        "GND"
+      ]
+    ],
+    "load_gnd_pins": [
+      [
+        "BatteryAA",
+        "GND"
+      ],
+      [
+        "Pump",
+        "GND"
+      ]
+    ]
+  },
+  "axis_b": {
+    "isolation_pass": true,
+    "erc_errors": 0,
+    "logic_gnd_pins": [
+      [
+        "Arduino",
+        "GND"
+      ],
+      [
+        "Relay",
+        "GND"
+      ],
+      [
+        "SoilMoisture",
+        "GND"
+      ]
+    ],
+    "load_gnd_pins": [
+      [
+        "BatteryAA",
+        "GND"
+      ],
+      [
+        "Pump",
+        "GND"
+      ]
+    ],
+    "shared": []
+  },
+  "agree": true,
+  "node_sets_equal": true,
+  "mutant": {
+    "axis_b_caught": true,
+    "axis_b_shared_example": [
+      [
+        "Arduino",
+        "GND"
+      ],
+      [
+        "BatteryAA",
+        "GND"
+      ],
+      [
+        "Pump",
+        "GND"
+      ]
+    ]
+  }
+}

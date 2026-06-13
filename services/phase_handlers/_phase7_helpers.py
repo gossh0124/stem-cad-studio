@@ -111,9 +111,24 @@ def write_assembly_sop(
     material = enc.get("material", _ENC_DEFAULTS["material"])
     wall = enc.get("wall_thickness_mm", _ENC_DEFAULTS["wall_thickness_mm"])
     snap = bridge.get("snap_fit_params", {})
-    engine = cad_out.get("engine", "unknown")
+    # `cad_output["engine"]` is never written by any handler, so the old
+    # `engine != "build123d"` test always selected the PoC branch even for
+    # genuine build123d output. Derive the real engine from spec["kind"],
+    # which phase4 reliably sets to a production kind (two_piece / assembly /
+    # assembly_two_piece) when build_assembly_from_scene / build_pcb_two_piece
+    # succeed. Fall back to the legacy engine key, then "unknown".
+    _spec = cad_out.get("spec", {}) or {}
+    _spec_kind = _spec.get("kind", "")
+    _PROD_KINDS = {"two_piece", "assembly", "assembly_two_piece"}
+    if _spec_kind in _PROD_KINDS:
+        engine = "build123d"
+    else:
+        engine = cad_out.get("engine", "unknown")
     if engine == "unknown":
-        _logger.debug("cad_output missing engine for job %s", job.job_id)
+        _logger.debug(
+            "cad_output missing engine/production kind (spec kind=%r) for job %s",
+            _spec_kind, job.job_id,
+        )
     needs_vent = bridge.get("power_budget", {}).get("needs_ventilation", False)
 
     lines = [

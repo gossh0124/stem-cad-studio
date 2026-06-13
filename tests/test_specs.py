@@ -78,6 +78,29 @@ class TestSupplyV:
     def test_lipo_3v7(self):
         assert SUPPLY_V["Battery-LiPo-class"] == 3.7
 
+    def test_reads_through_same_as_voltage_v(self):
+        """B1:SUPPLY_V 對 in-SSOT 電源 class == VOLTAGE_V(同讀穿源 verified.json,零漂移)。
+        先前 SUPPLY_V 為手刻字典(與 verified.json 電壓重複);改 _section("supply_v") 後不得漂移。"""
+        from lib.specs import VOLTAGE_V
+        for cls in ("USB-5V-class", "USB-Adapter-class", "AC-Adapter-class",
+                    "Battery-AA-class", "Battery-LiPo-class"):
+            assert cls in SUPPLY_V, f"{cls} 未讀穿進 SUPPLY_V"
+            assert SUPPLY_V[cls] == VOLTAGE_V[cls], (
+                f"{cls}: SUPPLY_V={SUPPLY_V[cls]} != VOLTAGE_V={VOLTAGE_V[cls]}(漂移)")
+
+    def test_fallback_supply_v_only_for_absent_classes(self):
+        """B1:_fallback.supply_v 只補 verified.json 缺項的 alias variant,不得遮蔽 in-SSOT class。"""
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent
+        vj = json.loads((root / "data" / "component_datasheet_verified.json").read_text(encoding="utf-8"))
+        cache = json.loads((root / "data" / "_component_specs_cache.json").read_text(encoding="utf-8"))
+        for cls in cache.get("_fallback", {}).get("supply_v", {}):
+            if cls.startswith("_"):
+                continue
+            assert cls not in vj, f"{cls} 在 verified.json 卻被 _fallback.supply_v 遮蔽"
+            assert cls in SUPPLY_V, f"{cls} 在 _fallback 卻未進 SUPPLY_V"
+
 
 class TestPowerBudget:
     """POWER_BUDGET_MA has reasonable current budgets."""

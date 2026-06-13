@@ -408,10 +408,16 @@ class Phase1Handler(PhaseHandler):
     def _parse_output(raw: str) -> dict:
         """使用 lib/tools.extract_json（含 json_repair fallback）解析模型輸出，
         並做 post-repair schema 驗證確保結構完整。"""
-        if _extract_json is not None:
-            result = _extract_json(raw)
-            if isinstance(result, dict):
-                return Phase1Handler._validate_p1_schema(result)
+        if _extract_json is None:
+            # 基礎設施失敗(lib.tools / lib/tools fallback 皆 import 失敗),
+            # 並非「輸入太抽象」。不可回傳 {} 讓 execute() 誤報成 Phase1InputError。
+            raise RuntimeError(
+                "lib.tools.extract_json 無法載入,Phase I 輸出解析依賴缺失;"
+                "這是基礎設施錯誤,並非使用者輸入太抽象。"
+            )
+        result = _extract_json(raw)
+        if isinstance(result, dict):
+            return Phase1Handler._validate_p1_schema(result)
         return {}
 
     @staticmethod
@@ -424,8 +430,13 @@ class Phase1Handler(PhaseHandler):
         """
         try:
             from lib.config import TAXONOMY_CONFIG
-        except ImportError:
-            return obj
+        except ImportError as exc:
+            # 驗證模組無法載入 → 不可靜默放行未驗證的 LLM 輸出（always-green-gate）。
+            # 無法驗證就必須失敗,讓幻覺/非法元件類型不會繞過 post-repair guard。
+            raise RuntimeError(
+                "lib.config.TAXONOMY_CONFIG 無法載入,Phase I schema 驗證無法執行;"
+                "拒絕回傳未驗證的模型輸出。"
+            ) from exc
 
         comps = obj.get("components")
         if not isinstance(comps, list) or len(comps) == 0:

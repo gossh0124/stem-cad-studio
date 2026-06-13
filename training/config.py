@@ -25,7 +25,8 @@ TAXONOMY_CONFIG: Dict[str, Any] = {
     ],
 
     "component_taxonomy": {
-        "Brain":    ["Arduino-Uno-class", "ESP32-class", "RaspberryPi-class", "Microbit-class"],
+        # RaspberryPi-class 已退役（2026-06-13，方案 B；見 lib/config.py 同註解）：infra 休眠保留，僅退出訓練詞彙。
+        "Brain":    ["Arduino-Uno-class", "ESP32-class", "Microbit-class"],
         "Power":    ["USB-5V-class", "Battery-LiPo-class", "Battery-AA-class", "AC-Adapter-class", "USB-Adapter-class"],
         "Control":  ["Button-class", "Switch-class", "Switch-Generic-class", "Potentiometer-class", "Remote-class", "Joystick-class"],
         "Sensor":   ["Sensor-PIR-class", "Sensor-Ultrasonic-class", "Sensor-TempHumid-class", "Sensor-Light-class", "Sensor-SoilMoisture-class", "Sensor-IR-class", "Sensor-MSGEQ7-class"],
@@ -35,7 +36,6 @@ TAXONOMY_CONFIG: Dict[str, Any] = {
         "Lighting": ["Lighting-LED-RGB-class", "Lighting-LED-Strip-class", "Lighting-NeoPixel-class", "Lighting-LED-PWM-class"],
         "Mist":     ["Mist-Atomizer-class", "Mist-Ultrasonic-class"],
         "Chassis":  ["Chassis-Car-class"],
-        "Enclosure": ["Chassis-Car-class"],
     },
 
     "alias_mapping": {
@@ -65,7 +65,6 @@ EDUCATIONAL_RATIONALE: Dict[str, str] = {
     "Arduino-Uno-class":          "採用 ATmega328P 微控制器，透過數位/類比 GPIO 腳位控制外部元件。",
     "ESP32-class":                "雙核心 CPU 內建 Wi-Fi/Bluetooth，適合 IoT 無線控制應用。",
     "Microbit-class":             "內建加速度計與 LED 矩陣，專為 STEM 教育設計的微控制板。",
-    "RaspberryPi-class":          "Linux 單板電腦，適合需要作業系統支援的複雜 AI 應用。",
     "USB-5V-class":               "透過 USB 介面提供穩定 5V 直流電源，適合低功耗模組供電。",
     "Battery-LiPo-class":         "鋰聚合物電池，能量密度高，適合需要可攜式電源的專題。",
     "Battery-AA-class":           "標準 AA 乾電池，取得方便，適合低功耗感測器節點。",

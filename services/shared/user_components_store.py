@@ -38,7 +38,7 @@ class UserComponentSpec:
     weight_g: float = 10.0
     thermal_mw: float = 0.0
     enclosure_relation: str = "external"  # user 元件預設殼外（最保守，跳過 solver 幾何處理）
-    skip_enclosure: bool = True  # legacy mirror; auto-synced via __post_init__
+    skip_enclosure: bool = False  # legacy mirror; auto-synced via __post_init__ (matches ComponentSpec)
     tags: List[str] = field(default_factory=list)
     connector_ports: List[Dict[str, Any]] = field(default_factory=list)
     source: str = "user"

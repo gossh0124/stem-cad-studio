@@ -69,6 +69,47 @@ COMPONENT_REGISTRY: Dict[str, ComponentSpec] = {
     **POWER_COMPONENTS,
 }
 
+# -- Tier 1.5: geometry (L/W/H) read-through from verified.json physical (SSOT, B5-geo) --
+# Single source = data/component_datasheet_verified.json. registry is no longer authoritative
+# for geometry; the per-component L/W/H literals in _reg_*.py are stripped and populated here
+# (length_mm/width_mm/height_mm, with pcb_ prefix fallback, matching ssot_completeness /
+# test_read_through_invariant._verified_value). Runs BEFORE Tier 2 so lib/pcb (the authoritative
+# sub-mm coordinate source) still wins L/W for its 6 modules; height always from verified.json.
+# verified.json physical L/W/H gap (Motor-Stepper, pending caliper measurement, WIP) keeps its
+# _reg literal — listed in _GEOM_WIP_KEEP and frozen in test_read_through_invariant; any other
+# missing class raises (no silent 0 — CLAUDE.md: data gaps must fail loud).
+import json as _json
+from pathlib import Path as _Path
+
+_VJ_GEOM = _json.loads(
+    (_Path(__file__).resolve().parent.parent.parent / "data"
+     / "component_datasheet_verified.json").read_text(encoding="utf-8")
+)
+_GEOM_WIP_KEEP = frozenset({"Motor-Stepper-class"})  # verified.json physical L/W/H gap (WIP)
+
+
+def _vj_phys_lwh(class_name):
+    p = _VJ_GEOM.get(class_name, {}).get("physical", {})
+    return (p.get("length_mm") or p.get("pcb_length_mm"),
+            p.get("width_mm") or p.get("pcb_width_mm"),
+            p.get("height_mm"))
+
+
+_geom_missing: list = []
+for _cn, _spec in COMPONENT_REGISTRY.items():
+    if _cn in _GEOM_WIP_KEEP:
+        continue  # keep _reg literal (verified.json gap); guarded by #17 frozen inventory
+    _L, _W, _H = _vj_phys_lwh(_cn)
+    if _L and _W and _H:
+        _spec.length_mm, _spec.width_mm, _spec.height_mm = float(_L), float(_W), float(_H)
+    else:
+        _geom_missing.append(_cn)
+if _geom_missing:
+    raise ValueError(
+        "registry geometry read-through: missing verified.json physical L/W/H "
+        "(no silent default): " + ", ".join(sorted(_geom_missing))
+    )
+
 # -- Tier 2 module auto-apply PCBSpec (overwrite length/width/mounting_holes/ports) --
 for _class_name in _MODULES:
     if _class_name in COMPONENT_REGISTRY:

@@ -1,4 +1,4 @@
-"""tools/prompt_alignment_check.py — 防止 train/inference prompt drift。
+"""scripts/builders/prompt_alignment_check.py — 防止 train/inference prompt drift。
 
 兩種檢查：
   1. **HARDCODE scan**: lib/ + services/ 內若出現 system_msg literal
@@ -9,8 +9,8 @@
      對比 training/data/cadhllm_lora_b_ch3.jsonl 第一筆 → 必須完全相等。
 
 用法：
-  .venv/Scripts/python.exe tools/prompt_alignment_check.py            # 報 issues
-  .venv/Scripts/python.exe tools/prompt_alignment_check.py --strict   # CI 用,有 issues 即 exit 1
+  .venv/Scripts/python.exe scripts/builders/prompt_alignment_check.py            # 報 issues
+  .venv/Scripts/python.exe scripts/builders/prompt_alignment_check.py --strict   # CI 用,有 issues 即 exit 1
 
 Hook 整合：建議掛 PostToolUse on Edit/Write 編 lib/adapter_manager.py
 或 training/prompts.py 時自動跑(advisory)。
@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 # scan 目錄與排除
@@ -92,6 +92,20 @@ def check_byte_level_alignment() -> list[str]:
                 first_params = s.get("content", "")
             if first_plan and first_params:
                 break
+
+    # 若掃完整份 jsonl 仍找不到 plan / params 樣本（marker rename、格式漂移、
+    # 內容被改名/重構），代表這個 gate 想攔的 drift 已發生 → 必須 hard fail，
+    # 不可因為「沒比對到東西」而靜默回傳空 errors（always-green-gate）。
+    if first_plan is None:
+        errors.append(
+            f"jsonl 中找不到任何 plan 樣本（marker '<|im_start|>plan' 未命中）: {jsonl_path}"
+            " — 可能 marker rename / 格式漂移，byte-level check 無法執行"
+        )
+    if first_params is None:
+        errors.append(
+            f"jsonl 中找不到任何 params 樣本（marker '<|im_start|>params' 未命中）: {jsonl_path}"
+            " — 可能 marker rename / 格式漂移，byte-level check 無法執行"
+        )
 
     if first_plan and SYS_PLAN != first_plan:
         # 找出差異位置

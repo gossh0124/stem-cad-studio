@@ -64,7 +64,7 @@ def generate_wiring(
         return None
 
     try:
-        wiring_result = wiring_to_json(brain_key, all_comps)
+        wiring_result = wiring_to_json(brain_key, all_comps, power=power_key)
     except PinAllocationError as e:
         _log(progress_cb, f"  ❌ Pin 分配失敗：{e}")
         raise ValueError(
@@ -78,15 +78,27 @@ def generate_wiring(
     try:
         svg = generate_svg(brain_key, power_key, outputs, sensors)
         _log(progress_cb, f"  ✅ Schematic SVG 生成完成（{len(svg)} bytes）")
-    except Exception as e:
+        schematic_error = None
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        # 已知的 schematic 生成錯誤：記錄明確的 error marker,
+        # 不要用空字串假裝成功(下游無法分辨「不需要 schematic」與「生成崩潰」)。
+        # 非預期的例外仍會往上拋,不再被靜默吞掉。
         _log(progress_cb, f"  ⚠️ Schematic SVG 生成失敗：{e}")
         svg = ""
+        schematic_error = str(e)
 
     return {
         "allocation": wiring_result.get("allocation", {}),
         "pin_labels": wiring_result.get("pin_labels", {}),
         "wiring": wiring_result.get("wiring", {}),
         "schematic_svg": svg,
+        "schematic_error": schematic_error,
+        # S-power-inject: SSOT-derived power injection fields (None if unavailable)
+        "power_injection": wiring_result.get("power_injection"),
+        "load_power_injection": wiring_result.get("load_power_injection"),
+        # S-netlist: build_netlist 模型(供 runtime galvanic-isolation gate;原僅 to_json
+        # 內部用於 schematic ELK 配色,未往外傳)。[] 表 build_netlist 失敗或無 net。
+        "nets": wiring_result.get("nets", []),
     }
 
 
@@ -110,9 +122,16 @@ def estimate_layout_chamfer(
     n = len(specs)
     n_cols = max(2, math.ceil(math.sqrt(n)))
     n_rows = math.ceil(n / n_cols)
-    max_L = max(s.get("length_mm", 50) for s in specs)
-    max_W = max(s.get("width_mm",  30) for s in specs)
-    max_H = max(s.get("height_mm", 15) for s in specs)
+    for _s in specs:
+        for _k in ("length_mm", "width_mm", "height_mm"):
+            if _k not in _s:
+                raise ValueError(
+                    f"[Phase III] estimate_layout_chamfer: spec 缺少 '{_k}' 幾何尺寸，"
+                    f"無法估算空間佈局。請確認元件 spec 已含 length_mm/width_mm/height_mm。"
+                )
+    max_L = max(s["length_mm"] for s in specs)
+    max_W = max(s["width_mm"]  for s in specs)
+    max_H = max(s["height_mm"] for s in specs)
     cell_L = max_L + padding_mm
     cell_W = max_W + padding_mm
     inner_L = n_cols * cell_L + (n_cols + 1) * padding_mm
@@ -122,8 +141,8 @@ def estimate_layout_chamfer(
     positions = []
     for i, spec in enumerate(specs):
         col, row = i % n_cols, i // n_cols
-        cx = col * cell_L + padding_mm + spec.get("length_mm", 50) / 2
-        cy = row * cell_W + padding_mm + spec.get("width_mm",  30) / 2
+        cx = col * cell_L + padding_mm + spec["length_mm"] / 2
+        cy = row * cell_W + padding_mm + spec["width_mm"]  / 2
         positions.append(np.array([cx, cy, 0.0]))
 
     min_gaps = []
@@ -165,8 +184,14 @@ def check_interference(
         s = c.get("spec") or {}
         if not s:
             continue
-        l = float(s.get("length_mm", 50))
-        w = float(s.get("width_mm", 30))
+        for _k in ("length_mm", "width_mm"):
+            if _k not in s:
+                raise ValueError(
+                    f"[Phase III] check_interference: 元件 {c.get('type', '?')} 的 spec "
+                    f"缺少 '{_k}' 幾何尺寸，無法進行干涉檢測。"
+                )
+        l = float(s["length_mm"])
+        w = float(s["width_mm"])
         specs.append({"idx": i, "type": c.get("type", "?"), "l": l, "w": w})
 
     if len(specs) < 2:

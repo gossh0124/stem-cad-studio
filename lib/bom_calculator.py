@@ -79,12 +79,16 @@ def calculate_bom(
 
         unit_ma = lookup_constant(POWER_MA, ctype, None)
         if unit_ma is None:
-            _log.warning("BOM: unknown ctype=%r, using fallback 50mA", ctype)
-            unit_ma = 50.0
+            raise ValueError(
+                f"BOM: unknown component type {ctype!r} -- not found in POWER_MA. "
+                "Add it to data/component_datasheet_verified.json or _component_specs_cache.json._fallback.power_ma"
+            )
         unit_ntd = lookup_constant(PRICE_NTD, ctype, None)
         if unit_ntd is None:
-            _log.warning("BOM: unknown ctype=%r, using fallback 100NTD", ctype)
-            unit_ntd = 100
+            raise ValueError(
+                f"BOM: unknown component type {ctype!r} -- not found in PRICE_NTD. "
+                "Add it to lib/specs.py PRICE_NTD dict."
+            )
 
         comp_ma = unit_ma * qty
         comp_ntd = unit_ntd * qty

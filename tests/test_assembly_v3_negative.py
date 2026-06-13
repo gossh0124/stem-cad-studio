@@ -191,15 +191,17 @@ def test_pack_compact_no_overlap_when_rotation_forced():
 # ════════════════════════════════════════════════════════════════════════════
 
 def test_solve_v3_unknown_component_skipped():
-    """Unknown comp_type should be silently skipped (not crash). Known ones still solved."""
+    """No-Silent-Fallback: an unknown comp_type must NOT be silently dropped — a
+    requested component vanishing from the physical assembly is a correctness bug,
+    so solve_v3 must raise (was: silently skipped). Known ones never get a chance
+    to mask the missing one."""
+    import pytest
     comps = [
         {"type": "Arduino-Uno-class", "role": "Brain"},
         {"type": "Nonexistent-Foo-class", "role": "Sensor"},  # not in registry
     ]
-    sg = solve_v3(comps, {}, ENCLOSURE)
-    types = [m["comp_type"] for m in sg["modules"]]
-    assert "Arduino-Uno-class" in types
-    assert "Nonexistent-Foo-class" not in types
+    with pytest.raises(KeyError, match="Nonexistent-Foo-class"):
+        solve_v3(comps, {}, ENCLOSURE)
 
 
 def test_solve_v3_no_wiring_no_wires_no_crash():

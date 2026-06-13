@@ -125,6 +125,7 @@ class ComponentModule:
                 for m in self.meshes
             ],
             "assembly_steps": list(self.assembly_steps),
+            "host_structure": self.host_structure,
         }
 
 
@@ -151,6 +152,27 @@ def _wall_thickness(class_name: str) -> float:
     if meta and "spec_dict" in meta:
         return float(meta["spec_dict"].get("wall", _DEFAULT_WALL_THICKNESS))
     return _DEFAULT_WALL_THICKNESS
+
+
+def _shell_outer_dims(class_name: str) -> tuple[float, float, float]:
+    """(outer_l, outer_w, outer_h) for a two_piece shell, from its meta.
+
+    outer_h = base_h + lid_h (the full printed enclosure: base cavity + lid).
+    Raises if the shell meta lacks any required key — a two_piece shell with an
+    incomplete meta must surface (no-fallback) rather than silently fall back to
+    the comp_spec + wall approximation, which under-reports the enclosure by
+    ~8mm and squashes the rendered 3D module (UND-A2 / F-A2).
+    """
+    meta = _read_shell_meta(class_name)
+    sd = (meta or {}).get("spec_dict") or {}
+    missing = [k for k in ("outer_l", "outer_w", "base_h", "lid_h") if k not in sd]
+    if missing:
+        raise KeyError(
+            f"{class_name}: two_piece shell meta spec_dict missing {missing} "
+            f"— cannot derive outer dimensions (no fallback)"
+        )
+    return (float(sd["outer_l"]), float(sd["outer_w"]),
+            float(sd["base_h"]) + float(sd["lid_h"]))
 
 
 def _has_shell(class_name: str) -> bool:
@@ -384,9 +406,13 @@ def build_module(comp_type: str, role: str) -> ComponentModule:
     wall = _wall_thickness(class_name) if has_shell else 0.0
 
     # 4. Module outer dimensions
-    length = comp_spec.length_mm + (2 * wall if has_shell else 0.0)
-    width = comp_spec.width_mm + (2 * wall if has_shell else 0.0)
-    height = comp_spec.height_mm + (wall if has_shell else 0.0)  # lid adds wall
+    # F-A2 (UND-A2): two_piece shell outer box comes from shell meta (not +wall approx)
+    if has_shell:
+        length, width, height = _shell_outer_dims(class_name)
+    else:
+        length = comp_spec.length_mm
+        width = comp_spec.width_mm
+        height = comp_spec.height_mm
 
     # 5. Pin3D
     pins: List[Pin3D] = []
@@ -440,7 +466,12 @@ def build_modules(components: List[dict]) -> List[ComponentModule]:
         comp_type = comp.get("type", "")
         role = comp.get("role", "")
         if comp_type not in COMPONENT_REGISTRY:
-            logger.warning("Unknown component type %r, skipping", comp_type)
-            continue
+            # No-Silent-Fallback: a requested component must never vanish from
+            # the physical assembly. Surface the unknown type as an error rather
+            # than logging-and-skipping (build_module() raises KeyError too).
+            raise KeyError(
+                f"Unknown component type {comp_type!r}: not in COMPONENT_REGISTRY "
+                f"— refusing to silently drop it from the assembly"
+            )
         modules.append(build_module(comp_type, role))
     return modules

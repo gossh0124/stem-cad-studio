@@ -123,9 +123,20 @@ def _gen_rpi(outputs: list[str], sensors: list[str], power: str,
         lines.append("    # ── 感測→致動規則 ──")
         for r in reactions:
             py_cond = _rpi_cond_map.get(r["condition"], r["condition"])
-            acts = _rpi_action_map.get(r["output"], {})
-            on_act = acts.get("on", f"# {r['output']} ON")
-            off_act = acts.get("off", f"# {r['output']} OFF")
+            acts = _rpi_action_map.get(r["output"])
+            if not acts:
+                # 該 reaction output 在 RPi 沒有真正的 gpiozero 致動實作,
+                # 不能靜默產生「只有註解、什麼都不做」的 if/else no-op,
+                # 那會產出看似實作卻完全失效的韌體。改為明確 raise。
+                raise NotImplementedError(
+                    f"RPi reaction output '{r['output']}' has no gpiozero "
+                    f"actuation mapping in _rpi_action_map. Supported outputs: "
+                    f"{sorted(_rpi_action_map.keys())}. Extend _rpi_action_map "
+                    f"(and the device-init block) before pairing this output, "
+                    f"or exclude it from REACTION_RULES."
+                )
+            on_act = acts["on"]
+            off_act = acts["off"]
             lines.append(f"    # {r['label']}")
             lines.append(f"    if {py_cond}:")
             lines.append(f"        {on_act}")

@@ -27,6 +27,11 @@ def _validate_thermal(
         if mw is None and thermal_index:
             ti = thermal_index.get(c.type, {})
             mw = ti.get("total_typical_mw", 0)
+        if mw is not None and mw < 0:
+            raise ValueError(
+                f"thermal_mw for component type '{c.type}' is negative ({mw}); "
+                "bad datasheet/estimation input — refusing to under-size venting"
+            )
         if mw is not None and mw > 0:
             is_estimated = c.thermal_mw is None and thermal_index is not None
             heat_sources.append({
@@ -37,7 +42,6 @@ def _validate_thermal(
                 "estimation_source": "V×I×η" if is_estimated else "datasheet",
                 "user_confirmed": False,
             })
-        if mw is not None:
             total_mw += mw
 
     total_w = total_mw / 1000.0

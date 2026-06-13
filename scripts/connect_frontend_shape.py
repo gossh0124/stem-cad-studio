@@ -52,7 +52,7 @@ def migrate_class(cls_name: str, spec: dict) -> tuple[list[tuple], list[tuple]]:
         # 計算 on_board center
         sub_cx = sub["x_mm"] + sub["w_mm"] / 2
         sub_cy = sub["y_mm"] + sub["h_mm"] / 2
-        if abs(ep.get("cx", 0) - sub_cx) <= TOL_MM and abs(ep.get("cy", 0) - sub_cy) <= TOL_MM:
+        if abs(ep.get("cx", 0) - sub_cx) <= TOL_MM and abs(ep.get("cy", 0) - sub_cy) <= TOL_MM:  # nofallback-ok: 配對謂詞,cx/cy 缺值=不可能對齊,0 僅使比較必 False(保守落 remaining),不進資料
             # 可遷：用 SSOT label（on_board 的 label/name）為 frontend_shape key
             ssot_label = sub.get("label") or sub.get("name")
             entry: dict = {

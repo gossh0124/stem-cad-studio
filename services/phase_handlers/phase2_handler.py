@@ -18,7 +18,11 @@ _log = logging.getLogger("cadhllm.phase2")
 
 from .base import PhaseHandler
 from ..shared.models import Job, PhaseID
-from lib.specs import COMPONENT_SHORTHAND_ALIASES as _SHORTHAND_ALIASES
+from lib.specs import (COMPONENT_SHORTHAND_ALIASES as _SHORTHAND_ALIASES,
+                       POWER_BUDGET_MA as _POWER_BUDGET_MA,
+                       USB_BUDGET_MA as _USB_BUDGET_MA,
+                       POWER_MA as _POWER_MA,
+                       lookup_constant as _lookup_constant)
 
 try:
     from lib.wiring.template_gen import load_datasheet as _load_datasheet
@@ -113,10 +117,10 @@ class Phase2Handler(PhaseHandler):
     # ── CAG Layer 1: datasheet 精確規格 ──
     def _datasheet_spec(self, ctype: str) -> dict | None:
         """從 verified datasheet 提取元件物理/電氣規格，格式與 registry spec 相容。"""
-        try:
-            ds = _load_datasheet()
-        except Exception:
-            return None
+        # 'datasheet 不存在' 由 _load_datasheet 回傳 {}（見 load_datasheet）；
+        # 此處不吞例外——verified datasheet 存在卻解析失敗（如 JSONDecodeError）
+        # 是資料損毀，必須大聲失敗，不可靜默降級為 registry-only 規格。
+        ds = _load_datasheet()
         if not ds:
             return None
 
@@ -132,8 +136,18 @@ class Phase2Handler(PhaseHandler):
 
         if "length_mm" in phys:
             spec["length_mm"] = phys["length_mm"]
-            spec["width_mm"] = phys.get("width_mm", 0)
-            spec["height_mm"] = phys.get("height_mm", 0)
+            if "width_mm" not in phys:
+                raise ValueError(
+                    f"元件 '{ctype}' 在 verified datasheet 中有 length_mm "
+                    f"但缺少 width_mm — 請補全 data/component_datasheet_verified.json"
+                )
+            if "height_mm" not in phys:
+                raise ValueError(
+                    f"元件 '{ctype}' 在 verified datasheet 中有 length_mm "
+                    f"但缺少 height_mm — 請補全 data/component_datasheet_verified.json"
+                )
+            spec["width_mm"] = phys["width_mm"]
+            spec["height_mm"] = phys["height_mm"]
         if "weight_g" in phys:
             spec["weight_g"] = phys["weight_g"]
         if "current_typ_ma" in elec:
@@ -336,50 +350,18 @@ class Phase2Handler(PhaseHandler):
 
     def _check_power_early(self, components: list, progress_cb) -> dict:
         """Phase 2 提前功率稽核：找出超載組合並立即警示。"""
-        # 靜態 fallback（datasheet 無資料時使用）
-        _MA_FALLBACK = {
-            "Arduino-Uno-class": 50, "Arduino-Nano-class": 19,
-            "ESP32-class": 240, "ESP8266-class": 170,
-            "RaspberryPi-4B-class": 600, "RaspberryPi-class": 600,
-            "Microbit-class": 90,
-            "Servo-SG90-class": 250, "Motor-Servo-class": 250,
-            "DCMotor-L298N-class": 600, "Motor-DC-class": 600,
-            "Motor-Stepper-class": 240,
-            "NeoPixel-Strip-class": 300, "Lighting-NeoPixel-class": 480,
-            "Lighting-LED-Strip-class": 200, "Lighting-LED-RGB-class": 20,
-            "Lighting-LED-PWM-class": 20,
-            "DFPlayer-Speaker-class": 500, "MP3-Module-class": 200,
-            "LED-Matrix-class": 320,
-            "Mist-Atomizer-class": 350, "Mist-Ultrasonic-class": 500,
-        }
-        _SUPPLY_MA = {
-            "USB-Buck-5V-class": 2000, "LiPo-Charger-class": 1000,
-            "BatteryHolder-AA-class": 800,
-            "USB-5V-class": 1000, "Battery-LiPo-class": 1000,
-            "Battery-AA-class": 800,
-            "AC-Adapter-class": 2000, "USB-Adapter-class": 1000,
-        }
-        USB_DEFAULT = 500
-
-        # CAG: datasheet electrical.current_typ_ma 覆寫靜態值
-        _ma = dict(_MA_FALLBACK)
-        try:
-            ds = _load_datasheet()
-            for key, entry in ds.items():
-                if key.startswith("_") or not isinstance(entry, dict):
-                    continue
-                elec = entry.get("electrical", {})
-                if "current_typ_ma" in elec:
-                    _ma[key] = elec["current_typ_ma"]
-        except Exception:
-            pass
-
-        total_ma  = sum(_ma.get(c.get("type",""), 20) * c.get("qty",1) for c in components)
-        supply_ma = next(
-            (_SUPPLY_MA[c.get("type","")] for c in components
-             if c.get("type","") in _SUPPLY_MA),
-            USB_DEFAULT,
-        )
+        # 元件耗電與電源供電上限皆讀穿 specs(verified.json 單一官方源，#20/B2)——早期警示
+        # 與 Phase 3 BOM 同源。耗電用 POWER_MA(electrical.current_typ_ma，alias-aware via
+        # lookup_constant);先前 _MA_FALLBACK 手刻副本(與 POWER_MA 漂移，如 Servo-SG90 250 vs
+        # 官方 150)+ 冗餘 datasheet 覆寫迴圈已刪。未知元件預設 20mA(早期警示為軟估計，非 raise)。
+        total_ma  = sum(_lookup_constant(_POWER_MA, c.get("type", ""), 20) * c.get("qty", 1)
+                        for c in components)
+        supply_ma = _USB_BUDGET_MA
+        for c in components:
+            t = str(c.get("type", ""))
+            if t in _POWER_BUDGET_MA:
+                supply_ma = _POWER_BUDGET_MA[t]
+                break
         if total_ma > supply_ma:
             msg = (f"⚡ [Phase II 早期警示] 總功耗 {total_ma}mA > "
                    f"電源上限 {supply_ma}mA，建議升級至 USB-Buck-5V-class (2A)")

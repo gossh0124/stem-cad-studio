@@ -418,3 +418,68 @@ class TestCheckInterference:
         result = handler._check_interference(comps, None, keepout_mm=5.0)
         assert result["keepout_mm"] == 5.0
 
+    def test_missing_length_mm_raises(self, handler):
+        """spec exists but missing length_mm -> ValueError."""
+        comps = [
+            _make_comp("Brain", "Arduino-Uno-class",
+                       spec={"width_mm": 30, "height_mm": 10}),
+            _make_comp("Sensor", "Sensor-TempHumid-class",
+                       spec={"length_mm": 15, "width_mm": 12, "height_mm": 8}),
+        ]
+        with pytest.raises(ValueError, match="length_mm"):
+            handler._check_interference(comps, None)
+
+    def test_missing_width_mm_raises(self, handler):
+        """spec exists but missing width_mm -> ValueError."""
+        comps = [
+            _make_comp("Brain", "Arduino-Uno-class",
+                       spec={"length_mm": 68, "height_mm": 10}),
+            _make_comp("Sensor", "Sensor-TempHumid-class",
+                       spec={"length_mm": 15, "width_mm": 12, "height_mm": 8}),
+        ]
+        with pytest.raises(ValueError, match="width_mm"):
+            handler._check_interference(comps, None)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 8. estimate_layout_chamfer -- geometry guard (V2 salvage)
+# ═══════════════════════════════════════════════════════════════
+
+class TestEstimateLayoutChamfer:
+    """estimate_layout_chamfer: strict geometry key guard from V2."""
+
+    def test_missing_geometry_raises(self, handler):
+        """spec exists but missing height_mm -> ValueError."""
+        comps = [
+            _make_comp("Brain", "Arduino-Uno-class",
+                       spec={"length_mm": 68, "width_mm": 53}),
+            _make_comp("Sensor", "Sensor-TempHumid-class",
+                       spec={"length_mm": 15, "width_mm": 12, "height_mm": 8}),
+        ]
+        with pytest.raises(ValueError, match="height_mm"):
+            handler._estimate_layout_chamfer(comps, None)
+
+    def test_missing_length_mm_raises(self, handler):
+        """spec exists but missing length_mm -> ValueError."""
+        comps = [
+            _make_comp("Brain", "Arduino-Uno-class",
+                       spec={"width_mm": 53, "height_mm": 10}),
+        ]
+        with pytest.raises(ValueError, match="length_mm"):
+            handler._estimate_layout_chamfer(comps, None)
+
+    def test_complete_spec_no_raise(self, handler):
+        """Full spec dict should not raise."""
+        comps = [
+            _make_comp("Brain", "Arduino-Uno-class",
+                       spec={"length_mm": 68, "width_mm": 53, "height_mm": 10}),
+            _make_comp("Sensor", "Sensor-TempHumid-class",
+                       spec={"length_mm": 15, "width_mm": 12, "height_mm": 8}),
+        ]
+        # Should not raise; result depends on numpy availability
+        try:
+            result = handler._estimate_layout_chamfer(comps, None)
+            assert result.get("status") in ("OK", "WARN", "SKIP")
+        except ImportError:
+            pytest.skip("numpy not available")
+

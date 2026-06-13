@@ -31,16 +31,21 @@ def build_relay_pcb_body() -> bd.Compound:
     # PCB
     parts.append(make_pcb_board(50, 26, pz, PCB_BLUE, "Relay_PCB"))
 
-    # Relay body -- center-right
-    add(parts, box(8, 0, pz + 7.75, 19, 15.5, 15.5), RELAY_BLUE, "Relay_Body")
-    # Top label stripe
-    add(parts, box(8, 0, pz + 15.52, 15, 3, 0.04), WHITE, "Relay_Label")
+    # Relay body -- shifted left so it clears the +X screw terminals (was x=8,
+    # span -1.5..17.5, overlapped terminals at 15..20). Now cx=-2 → span -11.5..7.5
+    # (+X edge 7.5 < 15). Taller can (dz 15.5→18) to read like real SRD-05VDC.
+    relay_navy = bd.Color(0.118, 0.227, 0.373)  # #1e3a5f
+    add(parts, box(-2, 0, pz + 9.0, 19, 15.5, 18), relay_navy, "Relay_Body")
+    # Top label stripe (same x as can, sits on raised top: pz + 18 = 19)
+    add(parts, box(-2, 0, pz + 18.02, 15, 3, 0.04), WHITE, "Relay_Label")
 
-    # Screw terminal block (3 terminals at +X edge)
+    # Screw terminal block (3 terminals at +X edge). 5mm pitch → terminal width must be
+    # < 5 or the three blocks merge into one (was dy=7 → overlapping; fixed to 4.6).
     tx = 50 / 2 - 7.5
+    term_blue = bd.Color(0.133, 0.400, 0.667)  # #2266aa
     for i in range(3):
         ty = -5 + i * 5
-        add(parts, box(tx, ty, pz + 4, 5, 7, 8), METAL_DARK, f"Terminal_{i}")
+        add(parts, box(tx, ty, pz + 4, 5, 4.6, 8), term_blue, f"Terminal_{i}")
         add(parts, cyl(tx, ty, pz + 8.2, 1.2, 0.6), METAL, f"Screw_{i}")
 
     # Optocoupler DIP-4
@@ -72,12 +77,15 @@ def build_oled_pcb_body() -> bd.Compound:
 
     parts.append(make_pcb_board(27, 27, pz, PCB_BLACK, "OLED_PCB"))
 
-    # OLED glass -- centered upper area
-    add(parts, box(0, 3, pz + 0.75, 26, 15, 1.5), DISPLAY_DARK, "OLED_Glass")
+    # OLED glass -- centered upper area. Shrunk 26x15→22x12 so a PCB border shows
+    # (was overhanging the 27x27 board edges).
+    add(parts, box(0, 3, pz + 0.75, 22, 12, 1.5), DISPLAY_DARK, "OLED_Glass")
 
-    # Active display area
-    active_color = bd.Color(0.02, 0.02, 0.04)
-    add(parts, box(0, 3, pz + 1.52, 21.7, 10.9, 0.04), active_color, "OLED_Active")
+    # Active display area (SSOT 21.7x10.9). Distinct screen tint (#13183a, was
+    # near-identical to glass) and raised above glass top with real thickness so
+    # it is visible and not z-fighting with the glass.
+    active_color = bd.Color(0.075, 0.094, 0.227)  # #13183a
+    add(parts, box(0, 3, pz + 1.6, 21.7, 10.9, 0.3), active_color, "OLED_Active")
 
     # FPC ribbon behind display
     add(parts, box(0, 3, pz - 0.15, 25, 3, 0.3), BROWN, "FPC_Ribbon")

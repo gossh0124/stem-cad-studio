@@ -147,7 +147,7 @@ class TestAssemblyV3:
         assert ASSEMBLY_V3["CLEARANCE"] > 0
 
     def test_vent_threshold(self):
-        assert ASSEMBLY_V3["VENT_THRESHOLD_MW"] == 2000
+        assert ASSEMBLY_V3["VENT_THRESHOLD_MW"] == 1500
 
 
 class TestCadValidation:

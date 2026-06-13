@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -37,7 +38,18 @@ SSOT_JSON = ROOT / "data" / "component_datasheet_verified.json"
 AUDIT_LOG = ROOT / "data" / "ssot_audit_log.jsonl"
 DRIFT_GATE = ROOT / "scripts" / "derive_component_dimensions.py"
 
-VALID_VERDICTS = {"both_ok", "pin_fixed", "extra_fixed", "needs_datasheet"}
+VALID_VERDICTS = {"both_ok", "pin_fixed", "extra_fixed", "physical_fixed", "needs_datasheet"}
+
+# patch-physical 寫入的欄位級 provenance block（頂層 _-key；lib/specs.py 與 drift gate
+# 皆跳過 _-prefixed top-level key，故與既有 reader 隔離，不影響 specs cache / drift）。
+PHYS_AUDIT_KEY = "_ssot_physical_audit"
+
+# patch-physical 安全子集白名單：只准動純量 physical 尺寸 + 連接器 pitch。
+# 結構性欄位（pin 數、pin/孔座標、header 重排）一律拒絕——見 work/active/
+# 「StemAiAgentV3 session 收尾 2026-06-12」鐵則：不手填座標、pin/pitch 結構性改動留結構批次。
+_ALLOWED_PHYS_LEAVES = {"length_mm", "width_mm", "height_mm", "pcb_thickness_mm", "weight_g"}
+_PITCH_PATH_RE = re.compile(r"^pin_layout\.header_groups\[\d+\]\.pitch_mm$")
+_SEG_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+)\])?$")
 
 # 來源：docs/ssot_pin_layout_vs_extra_ports.md §B（24 DRIFT class）+ §G（22 frontend_shape 空 class，部分重疊）
 PENDING_CLASSES = [
@@ -124,6 +136,7 @@ def cmd_list(log: list[dict]) -> int:
             "both_ok": "[OK]      ",
             "pin_fixed": "[PIN-FIX] ",
             "extra_fixed": "[EXT-FIX] ",
+            "physical_fixed": "[PHY-FIX] ",
             "needs_datasheet": "[NEED-DS] ",
             "unaudited": "[ . ]     ",
         }.get(v, "[ ? ]     ")
@@ -158,11 +171,11 @@ def cmd_show(cls: str, ssot: dict, log: list[dict]) -> int:
         name = hg.get("name", "?")
         side = hg.get("side", "?")
         pin_count = hg.get("pin_count", "?")
-        pitch = hg.get("pitch_mm", "?")
+        pitch = hg.get("pitch_mm", "?")  # nofallback-ok: 審計 CLI 顯示用佔位，不進入計算或寫回
         pins = hg.get("pins", [])
         if pins:
-            cx = sum(p.get("x_mm", 0) for p in pins) / len(pins)
-            cy = sum(p.get("y_mm", 0) for p in pins) / len(pins)
+            cx = sum(p.get("x_mm", 0) for p in pins) / len(pins)  # nofallback-ok: 審計 CLI 顯示用質心,不進入計算或寫回
+            cy = sum(p.get("y_mm", 0) for p in pins) / len(pins)  # nofallback-ok: 審計 CLI 顯示用質心,不進入計算或寫回
             print(f"  [{name}] side={side} pins={pin_count} pitch={pitch} center=({cx:.2f}, {cy:.2f})")
         else:
             print(f"  [{name}] side={side} pins={pin_count} (pins 未列)")
@@ -173,8 +186,8 @@ def cmd_show(cls: str, ssot: dict, log: list[dict]) -> int:
 
     print("\n--- on_board_components（前 5 筆）---")
     for sub in (spec.get("on_board_components", []) or [])[:5]:
-        cx = sub.get("x_mm", 0) + sub.get("w_mm", 0) / 2
-        cy = sub.get("y_mm", 0) + sub.get("h_mm", 0) / 2
+        cx = sub.get("x_mm", 0) + sub.get("w_mm", 0) / 2  # nofallback-ok: 審計 CLI 顯示用,不進入計算或寫回
+        cy = sub.get("y_mm", 0) + sub.get("h_mm", 0) / 2  # nofallback-ok: 審計 CLI 顯示用,不進入計算或寫回
         print(f"  [{sub.get('label','?')}] center=({cx:.2f}, {cy:.2f}) shape={sub.get('shape')}")
 
     entry = _current_verdict(cls, log)
@@ -230,7 +243,13 @@ def cmd_patch_extra(cls: str, label: str, cx: float | None, cy: float | None,
     print(f"[patch] {cls} extra_ports['{label}']: {before} → {after}")
     print(f"[backup] {bak}")
     print(f"[drift gate] rc={rc}\n{out}")
-    return 0 if rc == 0 else 1
+    if rc != 0:
+        # drift gate FAIL → 已寫入的 SSOT 違反 drift，回滾至 patch 前的 .bak，
+        # 絕不把 gate-failing 的 SSOT 留在磁碟上（No-Silent-Fallback）
+        shutil.copy2(bak, SSOT_JSON)
+        print(f"[rollback] drift gate 失敗，已從備份還原 SSOT：{bak} → {SSOT_JSON}")
+        return 1
+    return 0
 
 
 def cmd_patch_pin(cls: str, group: str, pin_num: int, x: float | None, y: float | None,
@@ -266,7 +285,114 @@ def cmd_patch_pin(cls: str, group: str, pin_num: int, x: float | None, y: float 
     print(f"[drift gate] rc={rc}\n{out}")
     print("[REMINDER] pin_layout 改動會影響 wiring/drill；建議跑：")
     print("  .venv/Scripts/python.exe -m pytest tests/test_eagle_parse.py tests/test_layout_export.py -v")
-    return 0 if rc == 0 else 1
+    if rc != 0:
+        # drift gate FAIL → 回滾至 patch 前的 .bak，絕不留下 gate-failing 的 SSOT
+        shutil.copy2(bak, SSOT_JSON)
+        print(f"[rollback] drift gate 失敗，已從備份還原 SSOT：{bak} → {SSOT_JSON}")
+        return 1
+    return 0
+
+
+def _path_allowed(dotpath: str) -> bool:
+    """白名單守門：只准 physical 純量尺寸與連接器 pitch；其餘（座標、pin 數、結構）拒絕。"""
+    if dotpath.startswith("physical."):
+        return dotpath.split(".", 1)[1] in _ALLOWED_PHYS_LEAVES
+    return bool(_PITCH_PATH_RE.match(dotpath))
+
+
+def _resolve_container(spec: dict, dotpath: str) -> tuple[dict, str]:
+    """把 dotted path 解析成 (container_dict, leaf_key)，供純量 get/set。
+    支援 'physical.height_mm' 與 'pin_layout.header_groups[0].pitch_mm'。
+    中間節點須已存在（不自動建結構，fail-loud）；leaf 可不存在（null→value 填值合法）。"""
+    segs = dotpath.split(".")
+    cur = spec
+    for seg in segs[:-1]:
+        m = _SEG_RE.match(seg)
+        if not m:
+            raise KeyError(f"非法路徑片段: {seg!r}")
+        cur = cur[m.group(1)]
+        if m.group(2) is not None:
+            cur = cur[int(m.group(2))]
+    m = _SEG_RE.match(segs[-1])
+    if not m or m.group(2) is not None:
+        raise KeyError(f"leaf 必須是純量欄位名（不可帶索引）: {segs[-1]!r}")
+    return cur, m.group(1)
+
+
+def cmd_patch_physical(cls: str, sets: list[str], tier: str, sources: list[str],
+                       confidence: str, basis: str, notes: str, ssot: dict) -> int:
+    """套用安全子集純量修正（physical 尺寸 / 連接器 pitch）+ 欄位級 provenance。
+    管線同 patch-extra/pin：備份 → 改 → drift gate → 失敗回滾 → append audit log。"""
+    spec = ssot.get(cls)
+    if not spec:
+        print(f"[ERROR] class '{cls}' 不存在")
+        return 2
+    if not sets:
+        print("[ERROR] 需至少一個 --set path=value")
+        return 2
+
+    # 先全部解析 + 驗證（任一非法即中止，不留半套寫入）
+    planned: list[tuple[str, dict, str, object, float]] = []
+    for raw in sets:
+        if "=" not in raw:
+            print(f"[ERROR] --set 格式須為 path=value: {raw!r}")
+            return 2
+        path, val_s = raw.split("=", 1)
+        path = path.strip()
+        if not _path_allowed(path):
+            print(f"[ERROR] 路徑不在安全子集白名單: {path!r}\n"
+                  f"        只准 physical.{{length_mm,width_mm,height_mm,pcb_thickness_mm,weight_g}} "
+                  f"與 pin_layout.header_groups[N].pitch_mm；\n"
+                  f"        結構性 pin/座標改動請走結構批次，非此指令。")
+            return 2
+        try:
+            value = float(val_s.strip())
+        except ValueError:
+            print(f"[ERROR] value 非數值: {val_s!r}")
+            return 2
+        try:
+            container, leaf = _resolve_container(spec, path)
+        except (KeyError, IndexError, TypeError) as e:
+            print(f"[ERROR] 路徑無法解析（中間結構不存在？）: {path!r} — {e}")
+            return 2
+        before = container.get(leaf)  # leaf 可能不存在 → None（null→value 合法）
+        planned.append((path, container, leaf, before, value))
+
+    bak = _backup_ssot()
+    changes = []
+    for path, container, leaf, before, value in planned:
+        container[leaf] = value
+        changes.append({"field": path, "before": before, "after": value})
+
+    # 欄位級 provenance（獨立 block，攜帶 tier，不污染 _ssot20_research_provenance）
+    ts = _dt.datetime.now().isoformat(timespec="seconds")
+    prov_cls = ssot.setdefault(PHYS_AUDIT_KEY, {}).setdefault(cls, {})
+    for path, container, leaf, before, value in planned:
+        prov_cls[path] = {
+            "value": value, "previous": before, "tier": tier,
+            "confidence": confidence, "basis": basis, "sources": sources, "ts": ts,
+        }
+
+    _write_ssot(ssot)
+    rc, out = _run_drift_gate()
+    _append_log({
+        "class": cls, "verdict": "physical_fixed", "action": "patch-physical",
+        "changes": changes, "tier": tier, "confidence": confidence,
+        "basis": basis, "sources": sources, "notes": notes, "drift_gate_rc": rc,
+    })
+    for c in changes:
+        print(f"[patch] {cls} {c['field']}: {c['before']} → {c['after']}")
+    print(f"[prov]  {PHYS_AUDIT_KEY}['{cls}'] += {len(changes)} 欄位 (tier={tier}, {len(sources)} sources)")
+    print(f"[backup] {bak}")
+    print(f"[drift gate] rc={rc}")
+    if out:
+        print(out)
+    if rc != 0:
+        # drift gate FAIL → 回滾至 patch 前的 .bak，絕不留 gate-failing 的 SSOT（No-Silent-Fallback）
+        shutil.copy2(bak, SSOT_JSON)
+        print(f"[rollback] drift gate 失敗，已從備份還原 SSOT：{bak} → {SSOT_JSON}")
+        return 1
+    return 0
 
 
 def main() -> int:
@@ -288,6 +414,16 @@ def main() -> int:
     p_pp.add_argument("cls"); p_pp.add_argument("group"); p_pp.add_argument("pin_num", type=int)
     p_pp.add_argument("--x", type=float); p_pp.add_argument("--y", type=float)
     p_pp.add_argument("--notes", default="")
+    p_ph = sub.add_parser("patch-physical", help="修 physical 純量尺寸 / 連接器 pitch（安全子集）")
+    p_ph.add_argument("cls")
+    p_ph.add_argument("--set", dest="sets", action="append", default=[], metavar="PATH=VALUE",
+                      help="如 physical.height_mm=29 或 pin_layout.header_groups[0].pitch_mm=2.0；可重複")
+    p_ph.add_argument("--tier", required=True, help="來源 tier（A/B/community/empirical）")
+    p_ph.add_argument("--source", dest="sources", action="append", default=[],
+                      metavar="'name | url'", help="provenance 來源；可重複")
+    p_ph.add_argument("--confidence", default="")
+    p_ph.add_argument("--basis", default="")
+    p_ph.add_argument("--notes", default="")
 
     # 也支援頂層 --list / --show CLS 的捷徑寫法
     ap.add_argument("--list", action="store_true", dest="top_list")
@@ -309,6 +445,9 @@ def main() -> int:
         return cmd_patch_extra(args.cls, args.label, args.cx, args.cy, args.notes, ssot)
     if args.cmd == "patch-pin":
         return cmd_patch_pin(args.cls, args.group, args.pin_num, args.x, args.y, args.notes, ssot)
+    if args.cmd == "patch-physical":
+        return cmd_patch_physical(args.cls, args.sets, args.tier, args.sources,
+                                  args.confidence, args.basis, args.notes, ssot)
     ap.print_help()
     return 0
 

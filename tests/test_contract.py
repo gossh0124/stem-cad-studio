@@ -11,9 +11,8 @@ def _canned(name: str) -> dict:
     return json.loads((ROOT / "v6" / "canned" / f"{name}.json").read_text(encoding="utf-8"))
 
 
-def _valid_placement() -> dict:
-    return {"type": "Sensor-PIR-class", "role": "Sensor",
-            "x": 1.0, "y": 2.0, "L": 30.0, "W": 24.0, "H": 25.0, "face_out": "top"}
+def _valid_module() -> dict:
+    return {"position": [1.0, 2.0, 3.0], "dimensions": [30.0, 24.0, 25.0], "type": "Sensor-PIR-class"}
 
 
 class TestContract:
@@ -22,27 +21,26 @@ class TestContract:
         assert rpt.verdict == Verdict.PASS, rpt.render_text()
 
     def test_valid_synthetic_passes(self):
-        b = {"cad_output": {"component_placements": [_valid_placement()]}}
+        b = {"cad_output": {"scene_graph_v3": {"modules": [_valid_module()]}}}
         assert check_cad_output_contract(b).verdict == Verdict.PASS
 
     def test_no_cad_output_fails(self):
         assert check_cad_output_contract({"project_name": "x"}).verdict == Verdict.FAIL
 
     def test_empty_placements_fails(self):
-        b = {"cad_output": {"component_placements": []}}
+        b = {"cad_output": {"scene_graph_v3": {"modules": []}}}
         assert check_cad_output_contract(b).verdict == Verdict.FAIL
 
     def test_missing_field_fails(self):
-        p = _valid_placement()
-        del p["H"]
-        del p["face_out"]
-        b = {"cad_output": {"component_placements": [p]}}
+        m = _valid_module()
+        del m["dimensions"]
+        b = {"cad_output": {"scene_graph_v3": {"modules": [m]}}}
         assert check_cad_output_contract(b).verdict == Verdict.FAIL
 
     def test_nonnumeric_coord_fails(self):
-        p = _valid_placement()
-        p["x"] = "oops"
-        b = {"cad_output": {"component_placements": [p]}}
+        m = _valid_module()
+        m["position"][0] = "oops"
+        b = {"cad_output": {"scene_graph_v3": {"modules": [m]}}}
         assert check_cad_output_contract(b).verdict == Verdict.FAIL
 
     def test_not_dict_fails(self):

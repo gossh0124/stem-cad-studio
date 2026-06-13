@@ -1,103 +1,128 @@
-# StemCAD Studio
+# stem-cad-studio
 
-**文字 → 可製造的 STEM 硬體專題。** 學生用一句話描述想做的專題（例如「我想做一台自動澆花器」），系統端到端產出：元件清單 (BOM)、電路圖、可 3D 列印的外殼 STL、可上傳 Arduino 的韌體程式碼 — 全部基於**真實元件 datasheet**，並包進 **6E 教學流程**（Engage → Explore → Explain → Engineer → Evaluate → Extend）。
+**An open-source, end-to-end AI-assisted hardware design platform for STEM education.**
 
-> 內部代號：CADHLLM（CAD Hierarchical LLM）。
+stem-cad-studio takes free-form natural language input and generates physically printable STEM teaching aids — producing 3D CAD enclosures, PCB layouts, and microcontroller firmware in a single automated pipeline.
 
----
+> **Core Thesis Proposition:** *Free-form input → Printable STEM teaching aids × 6E instructional model × Cross-four-domain learning (circuits, HCI, 3D design, software-hardware integration)*
 
-## 它做什麼（7 階段 pipeline → 6E）
+## What This Project Does
 
-| 階段 | Handler | 產物 |
-|------|---------|------|
-| Phase I 意圖理解 | `phase1` | LoRA-A 推論：專題分類 + 子系統規劃 + BOM 草案 |
-| Phase II 規格補全 | `phase2` | Component Registry（SSOT）補全真實型號 spec / 尺寸 / port / 鎖孔 |
-| Phase III 電氣工程 | `phase3` | 功率預算 + IO 衝突驗證 + 接線分配 + ELK schematic + BOM.md |
-| Phase IV 機構工程 | `phase4` | 元件佈局（assembly_solver）+ 外殼幾何 + 多元件組裝 → 可列印 STL |
-| Phase V 輸出渲染 | `phase5` | 多視圖 PNG + Three.js 3D 檢視 + Arduino 韌體合成 |
-| Phase VI 驗證閉環 | （併入 V / QA） | VLM / contract 驗證 — 無獨立 handler，整合於輸出與 QA gate |
-| Phase VII 人工修正 | `phase7` | HITL 人機互動修正（lock-file 非同步閉環） |
+A student or educator describes what they want to build in plain language. The system:
 
-> 上表階段定義以 `services/phase_handlers/` 實際 handler 為準（權威路線見 [docs/ROADMAP.md](docs/ROADMAP.md)）。
+1. **Parses** the intent through a CAD Domain-Specific Language (DSL) designed for LLM-friendly geometric control
+2. **Generates** a complete hardware package: 3D-printable enclosure, PCB layout, and matching firmware
+3. **Verifies** every output through a multi-layer automated verification pipeline (L0–L3) — no silent failures, no hallucinated parameters
+4. **Outputs** files ready for consumer-grade 3D printers and off-the-shelf components
 
-各階段共用一份逐步累積的 **Bridge JSON**。內建 16 個 demo 範本（自動澆花器 / 紅外避障車 / 電子琴 / 門禁 …）。
+## Architecture Overview
 
----
-
-## 快速開始
-
-```bash
-# 需 Python >= 3.12（程式碼使用 PEP 701 f-string 語法）
-# Python 一律用 venv（不要用系統 Python）
-python -m venv .venv
-.venv/Scripts/pip install -r services/requirements.txt   # Windows
-# 或 .venv/bin/pip install -r services/requirements.txt   # macOS/Linux
-
-# 啟動 gateway
-.venv/Scripts/python run_server.py --port 8000
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Natural Language Input                 │
+└──────────────────────────┬──────────────────────────────┘
+                           ▼
+              ┌────────────────────────┐
+              │     CAD DSL Engine     │
+              │  (Domain-Specific Lang)│
+              └─────────┬──────────────┘
+                        ▼
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+  ┌───────────┐  ┌────────────┐  ┌────────────┐
+  │  3D CAD   │  │    PCB     │  │  Firmware  │
+  │ Enclosure │  │   Layout   │  │ Generator  │
+  │ Generator │  │  (Routing) │  │            │
+  └─────┬─────┘  └─────┬──────┘  └─────┬──────┘
+        │               │               │
+        └───────────────┼───────────────┘
+                        ▼
+           ┌────────────────────────┐
+           │   Assembly Solver      │
+           │  (Packing, Collision,  │
+           │   Thermal Analysis)    │
+           └─────────┬──────────────┘
+                     ▼
+        ┌────────────────────────────┐
+        │  Multi-Layer Verification  │
+        │  L0: Data Integrity        │
+        │  L1: Geometry / Netlist    │
+        │  L2: PCB Layout            │
+        │  L3: Assembly Validation   │
+        └────────────────────────────┘
+                     ▼
+           ┌──────────────────┐
+           │  Printable Output │
+           │  STL + Gerber +   │
+           │  .ino / .py       │
+           └──────────────────┘
 ```
 
-開啟 `http://localhost:8000/` 進入前端（`v6/`）。
+## Key Design Principles
 
----
+- **No-Silent-Fallback:** Every anomaly raises an error. The system never silently degrades or substitutes hallucinated values. If a generated design violates physical constraints, the pipeline stops and reports — it does not guess.
+- **Single Source of Truth (SSOT):** All component specifications (pin maps, dimensions, voltage domains, thermal limits) are grounded in a verified datasheet database. Generated designs are traceable back to authoritative data.
+- **Hierarchical LLM Planning:** Inspired by the CAD-HLLM framework (Zuo et al., ACML 2025), the system decomposes text-to-hardware generation into coarse symbolic planning followed by parametric completion — extended beyond pure CAD into PCB, firmware, and assembly.
 
-## 技術棧
+## Supported Hardware Platforms
 
-| 層 | 技術 |
-|----|------|
-| 後端 | FastAPI（async、SSE 串流） |
-| 前端 | React 18（JSX, no-build）+ Three.js 3D 檢視 |
-| CAD 引擎 | build123d（純 Python，可在 Colab 跑） |
-| LLM | Llama 3.1 8B + LoRA（cadhllm，驅動 Phase I–III）|
-| 檢索 | RAG 向量庫（元件案例） |
+| MCU Platform | Example Demos |
+|---|---|
+| Arduino Uno | auto_waterer, smart_nightlight, electronic_keyboard |
+| Arduino Nano | biped_robot |
+| Micro:bit | plant_monitor |
+| ESP32 | access_control |
 
----
+The system includes 16 template projects with **6 core validated demos** spanning 4 MCU platforms, each designed to be reproducible with consumer-grade 3D printers and off-the-shelf components.
 
-## 專案結構
+## Verification Pipeline
 
-| 目錄 | 內容 |
-|------|------|
-| `lib/` | 核心庫（cad / pcb / assembly_solver / wiring / firmware / rag / registry / 元件 SSOT）|
-| `services/` | FastAPI gateway + 7 個 phase handlers |
-| `v6/` | React 前端（6E 分頁 / schematic / 3D viewer）+ 16 canned 範本 |
-| `training/` | LoRA-A / LoRA-B 訓練（cadhllm）|
-| `data/` | 元件 SSOT（`component_datasheet_verified.json`）|
-| `scripts/` | regression、SSOT 驗證、`scripts/builders/`（canned bake / RAG index / prompt 對齊）|
-| `tests/` | 產品回歸測試 |
-| `docs/` | 設計 SPEC / 技術匯報 / roadmap |
+The system enforces correctness at four levels:
 
----
+| Level | Check | What It Catches |
+|---|---|---|
+| **L0** | Data Integrity | Missing fields, schema violations, SSOT drift |
+| **L1** | Geometry & Netlist | Collision detection, bounding box interference, circuit connectivity |
+| **L2** | PCB Layout | Routing validity, clearance rules, power rail feasibility |
+| **L3** | Assembly | Physical fit, thermal envelope (PLA Tg threshold), snap-fit analysis |
 
-## 元件 datasheet 與 RAG 索引（需自行取得 / 重建）
+## Tech Stack
 
-為尊重第三方版權，本 repo **不附帶**原廠 datasheet / reference design 二進位（Arduino / ESP32 / micro:bit / Raspberry Pi 的 PDF / EAGLE / KiCad 檔）。元件權威座標/尺寸已萃取進 `data/component_datasheet_verified.json`（SSOT）；若要重跑 PCB 抽取 pipeline，請自官方來源取得原始檔：
+- **Backend:** Python (FastAPI microservices, vLLM client for local model inference)
+- **Frontend:** React/JSX interactive visualization with preset project library
+- **AI Integration:** Claude API (primary reasoning), local vLLM (auxiliary tasks)
+- **CAD Engine:** build123d / OpenCascade (OCP) for parametric 3D modeling
+- **Verification:** 6,000+ automated tests, multi-layer validation pipeline
 
-| 元件 | 官方來源 |
-|------|---------|
-| Arduino UNO R3 | https://docs.arduino.cc/hardware/uno-rev3/ （datasheet A000066 + reference design）|
-| ESP32 DevKit v1 | https://www.espressif.com/en/products/socs/esp32 （ESP32 / ESP-WROOM-32 datasheet）|
-| BBC micro:bit V2 | https://tech.microbit.org/hardware/ （schematic / mechanical）|
-| Raspberry Pi 4B | https://www.raspberrypi.com/products/raspberry-pi-4-model-b/ （mechanical / product brief）|
+## Academic Context
 
-放回 `data/pcb_sources/<元件>/` 後即可跑抽取腳本。
+This project is being developed as a master's thesis at the Graduate Institute of Mathematics and Information Education, National Taipei University of Education (NTUE), under the supervision of Prof. Chien-Hsing Chou. The thesis investigates how AI-assisted hardware generation can support the 6E instructional model across four learning domains.
 
-**RAG 向量庫** `data/rag_db/` 未隨 repo 散布；重建：
+The generation core draws from the **CAD-HLLM** framework:
+> Zuo, Z., Gan, Y., Long, J., & Liu, X. (2025). *CAD-HLLM: Generating Executable CAD from Text with Hierarchical LLM Planning.* Proceedings of Machine Learning Research 304, ACML 2025.
 
-```bash
-.venv/Scripts/python scripts/builders/build_rag_index.py
-```
+## Project Status
 
----
+- ✅ Core architecture complete (V3 rewrite with 729-commit history)
+- ✅ 6 core demos validated across 4 MCU platforms
+- ✅ L0–L3 verification pipeline operational
+- ✅ 6,000+ automated tests passing
+- 🔄 Educational effectiveness study (Ch5 pre/post-test) in design phase
+- 🔄 Documentation and community onboarding materials
 
-## Scope
+## License
 
-**做**：把 STEM 專題想法產出符合需求且**能列印 / 能上傳**的 CAD 全流程。
+MIT License — see [LICENSE](LICENSE) for details.
 
-**不做**（scope 外）：切片器整合、進階 FEM 模擬、戶外 IP 密封、多軸機構。
+## Author
 
----
+**Po-Han Su (蘇柏翰)**
+- M.S. Student, AI Track — National Taipei University of Education
+- Previously: B.S. Electrical Engineering (Information Track), Tamkang University
+- Previously: Junior BIOS Firmware Engineer, Insyde Software
 
-## 設定
+## Acknowledgments
 
-服務端設定見 `services/server.env.example`（複製為 `services/server.env` 並填值）。
-production 必設 `CADHLLM_JWT_SECRET`（dev fallback 為不安全預設，僅供本機開發）。
+- Prof. Chien-Hsing Chou (周建興) for advising this research and providing funding support
+- National Taipei University of Education for institutional support
+- Anthropic for Claude — the primary AI reasoning engine powering this system

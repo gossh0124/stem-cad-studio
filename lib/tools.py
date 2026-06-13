@@ -190,9 +190,19 @@ def extract_output(text: str) -> Tuple[Optional[Dict[str, Any]], str, Optional[s
         return None, "failed", "Empty text"
     clean_text = re.sub(r'```json\s*', '', text)
     clean_text = re.sub(r'```', '', clean_text).strip()
-    match = re.search(r'\{.*\}', clean_text, re.DOTALL)
-    if match:
-        clean_text = match.group(0)
+    # 以括號平衡擷取「第一個完整」JSON 物件，與 extract_json 行為一致；
+    # 避免貪婪 re.search(r'\{.*\}') 從首個 '{' 跨抓到最後一個 '}' 而吞入後續物件/雜訊。
+    start = clean_text.find("{")
+    if start != -1:
+        depth = 0
+        for i, ch in enumerate(clean_text[start:], start=start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    clean_text = clean_text[start:i + 1]
+                    break
     try:
         return json.loads(clean_text), "strict", None
     except json.JSONDecodeError:
@@ -229,7 +239,9 @@ def extract_json(text: str) -> Optional[dict]:
                 try:
                     return json.loads(text[start:i + 1])
                 except json.JSONDecodeError:
-                    break
+                    # 此平衡 span 無法解析，繼續掃描後續的 depth-0 物件，
+                    # 而非直接 break 放棄；找不到才落到 extract_output fallback。
+                    continue
     obj, _, _ = extract_output(text)
     return obj
 

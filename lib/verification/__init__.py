@@ -23,7 +23,7 @@ from .report import (
 )
 from .l0_integrity import check_svg, check_png, check_mesh
 from .contract import check_cad_output_contract, check_model_registry, check_scene_graph_meshes
-from .l1_geometry import check_placement_collisions
+from .l1_geometry import check_placement_collisions, placements_from_scene_graph
 from .l1_netlist import check_netlist, check_wiring_netlist
 from .pcb_layout import audit_pcb_layout
 from .l2_layout import audit_schematic_layout, check_schematic_svg
@@ -42,6 +42,7 @@ __all__ = [
     "check_model_registry",
     "check_scene_graph_meshes",
     "check_placement_collisions",
+    "placements_from_scene_graph",
     "check_netlist",
     "check_wiring_netlist",
     "audit_pcb_layout",

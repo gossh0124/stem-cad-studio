@@ -168,9 +168,16 @@ def generate(
                 )
             elif backend == "vllm":
                 raise ConnectionError("CADHLLM_BACKEND=vllm 但 vLLM server 不可用")
-        except (ImportError, ConnectionError):
+            else:
+                _log.warning(
+                    "backend=auto: vLLM server unavailable, falling back to local transformers"
+                )
+        except (ImportError, ConnectionError) as exc:
             if backend == "vllm":
                 raise
+            _log.warning(
+                "backend=auto: vLLM unavailable (%s), falling back to local transformers", exc
+            )
 
     with _lock:
         _ensure_base_model()
@@ -198,29 +205,25 @@ def _build_subsystem_context(bridge: dict, components: List[dict]) -> Dict[str, 
     """彙整 Plan / Params 兩階段共用的子系統摘要與環境/外殼約束。"""
     from .specs import WEIGHT_G, THERMAL_MW, lookup_constant
 
+    _sentinel = object()
     subsystems = []
     total_w = 0.0
     total_t = 0.0
     for c in components:
         ctype = c.get("type", "")
-        _sentinel = object()
         w_val = lookup_constant(WEIGHT_G, ctype, _sentinel)
         if w_val is _sentinel:
-            _log.warning(
-                "WEIGHT_G: no entry for ctype=%r (alias-resolved key also missing); "
-                "skipping weight contribution — validate component taxonomy",
-                ctype,
+            raise KeyError(
+                f"WEIGHT_G: no entry for ctype={ctype!r} "
+                f"(alias-resolved key also missing); validate component taxonomy"
             )
-            w_val = 0.0
         w = float(w_val)
         t_val = lookup_constant(THERMAL_MW, ctype, _sentinel)
         if t_val is _sentinel:
-            _log.warning(
-                "THERMAL_MW: no entry for ctype=%r (alias-resolved key also missing); "
-                "skipping thermal contribution — validate component taxonomy",
-                ctype,
+            raise KeyError(
+                f"THERMAL_MW: no entry for ctype={ctype!r} "
+                f"(alias-resolved key also missing); validate component taxonomy"
             )
-            t_val = 0.0
         t = float(t_val)
         subsystems.append(f"{ctype}(weight={w}g, thermal={t}mW)")
         total_w += w
@@ -368,8 +371,10 @@ def infer_plan_params(bridge: dict, components: List[dict]) -> dict:
 
     try:
         from .cad import hl_dsl as dsl  # type: ignore
-    except (ImportError, Exception) as exc:
-        _log.warning("hl_dsl import failed, plan validation/compile skipped: %s", exc)
+    except ImportError as exc:
+        # A2 未上線（模組真的不存在）才算合法略過；其他例外（module body
+        # 內的 ValueError/SSOT 誤設/真 bug）不可吞，讓它穿透以免 gate 永遠綠燈。
+        _log.warning("hl_dsl not available (A2 not shipped), plan validation/compile skipped: %s", exc)
         dsl = None
 
     # 2) validate plan（A2 尚未實作則略過）
@@ -409,14 +414,16 @@ def infer_plan_params(bridge: dict, components: List[dict]) -> dict:
         except ValueError:
             # component_type 缺 dims：資料問題，不應靜默降級，直接穿透讓 caller 感知
             raise
-        except Exception as exc:
+        except (NotImplementedError, AttributeError) as exc:
+            # 僅「A2 尚未上線 / 符號缺失」才走 fallback；其他例外（KeyError/
+            # TypeError 等真實 compiler bug）讓它穿透，不可降級成 success-with-error。
             compiled = _fallback_compile(plan_dict, params_dict)
             return {
                 "plan": plan_dict,
                 "params": params_dict,
                 "compiled": compiled,
                 "source": "ch3_lora_b",
-                "error": f"compile_to_solver_dict failed, used fallback: {exc}",
+                "error": f"compile_to_solver_dict not available, used fallback: {exc}",
             }
     else:
         compiled = _fallback_compile(plan_dict, params_dict)

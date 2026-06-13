@@ -99,6 +99,7 @@ _PHASE_REQUIRED_KEYS: dict[int, list[str]] = {
 _CONSTRAINT_LABELS: dict[str, str] = {
     "power": "總功率", "io": "I/O", "pin_current": "GPIO 電流",
     "wiring": "佈線", "geometry": "幾何", "interference": "干涉",
+    "isolation": "電氣隔離",
 }
 
 
@@ -193,7 +194,14 @@ def p3_gate_headline(bridge: dict, suggestions: list) -> str:
 
 
 def p3_gate_payload(job: Job, bridge: dict) -> tuple:
-    p3chk = bridge.get("phase3_constraint_check", {})
+    p3chk = bridge.get("phase3_constraint_check")
+    # A missing/empty constraint-check result means the Phase III check did not
+    # run — that is a hard failure, NOT an implicit pass. Do not fail-open.
+    if not p3chk:
+        raise ValueError(
+            "phase3_constraint_check 缺失或為空：電氣約束檢查未執行，"
+            "不可放行 P3 gate（fail-closed）"
+        )
     if p3chk.get("overall_ok", True):
         return None, []
 
@@ -260,7 +268,21 @@ def gate_emit_and_apply(
     queue,
     emit_fn: Callable,
 ) -> str:
-    choice = (result or {}).get("choice_id", CHOICE_CONFIRM_SWAPS)
+    # HITL gate timeout (no human decision): _wait_for_gate_event returns None.
+    # Must NOT be coalesced into CHOICE_CONFIRM_SWAPS — a timeout is not an
+    # affirmative confirmation. Record a distinct timed_out state in the
+    # decision trail and abort instead of forging a swap-confirmation decision.
+    if result is None:
+        pb = bridge.get("power_budget", {})
+        decision_trail.log(job.job_id, "p3_constraint_gate", {
+            "action": "timeout", "overall_ok": False, "timed_out": True,
+            "total_ma": pb.get("total_ma", 0),
+            "budget_ma": pb.get("budget_ma", 500),
+        })
+        emit_fn(progress_cb, "  ⏱ HITL gate 逾時，未取得使用者決策，中止")
+        return "timed_out"
+
+    choice = result.get("choice_id", CHOICE_CONFIRM_SWAPS)
     if choice == CHOICE_SKIP_GATE and suggestions:
         emit_fn(progress_cb, "  ❌ 有替換方案時不允許 skip_gate")
         return "rerun_from_2"
@@ -274,7 +296,7 @@ def gate_emit_and_apply(
         emit_fn(progress_cb, "  ⏭ 使用者選擇忽略超標，繼續執行")
         return "continue"
 
-    selected = (result or {}).get("selected_swaps", [])
+    selected = result.get("selected_swaps", [])
     _apply_swaps_fn(bridge, suggestions, selected)
 
     pb = bridge.get("power_budget", {})

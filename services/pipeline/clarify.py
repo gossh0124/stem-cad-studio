@@ -95,6 +95,8 @@ def apply_clarify_answers(
         try:
             new_qty = int(new_qty)
         except (ValueError, TypeError):
+            if emit:
+                emit(f"⚠️ 數量修正被忽略：{ctype} 的回答「{new_qty}」無法解析為整數，沿用原數量")
             continue
         if new_qty < 1:
             new_qty = 1

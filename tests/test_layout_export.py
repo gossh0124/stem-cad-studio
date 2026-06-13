@@ -3,6 +3,8 @@
 驗證 VS-PCB 根治：後端權威 SSOT → 前端視覺佈局格式自動衍生，
 含漏畫補齊（Resonator/Cap-PC1/Cap-PC2）、位置取 .brd 真實中心、JS 文字輸出格式。
 """
+import os
+
 import pytest
 
 from lib.pcb import ARDUINO_UNO_R3
@@ -11,6 +13,15 @@ from lib.pcb.layout_export import (
     arduino_brd_centers, export_arduino_ports,
     port_to_js, render_ports_js, _fmt_num,
     render_arduino_section, extract_arduino_section, _DIMS_JS,
+    _ARDUINO_BRD,
+)
+
+# .brd 為 machine-local（data/pcb_sources gitignored，決策 B 2026-06-07）。檔不在時
+# （fresh clone / CI）依賴 .brd 衍生的測試「大聲」skip 而非 error。
+_brd_required = pytest.mark.skipif(
+    not os.path.exists(_ARDUINO_BRD),
+    reason=("UNO-TH_Rev3e.brd 不在（data/pcb_sources gitignored）。VS-PCB SSOT-derive "
+            "鏈需 .brd；還原見「開放問題待辦索引」。"),
 )
 
 # 前端 renderer（shapes-ic-conn.js / shapes-passive-mech.js）已實作的 shape 鍵
@@ -26,6 +37,8 @@ _KNOWN_SHAPES = {
 
 @pytest.fixture(scope="module")
 def ports():
+    if not os.path.exists(_ARDUINO_BRD):
+        pytest.skip("UNO-TH_Rev3e.brd 不在（data/pcb_sources gitignored）")
     return export_arduino_ports(ARDUINO_UNO_R3)
 
 
@@ -47,6 +60,7 @@ class TestMappings:
 
 
 # ── .brd 中心對映 ────────────────────────────────────────────
+@_brd_required
 class TestBrdCenters:
     def test_maps_all_render_components(self):
         centers = arduino_brd_centers()
@@ -61,6 +75,7 @@ class TestBrdCenters:
 
 
 # ── ports 輸出 ───────────────────────────────────────────────
+@_brd_required
 class TestExportPorts:
     def test_count(self, ports):
         # 17 sub_component + 4 mounting holes（VS-PCB①：+LP2985-3V3 +ICSP-Main）
@@ -128,6 +143,7 @@ class TestJsRender:
 
 
 # ── 前端檔案 drift 偵測（前端必須等於後端 SSOT 衍生，無容錯）─────────────
+@_brd_required
 class TestFrontendNoDrift:
     """component-dimensions.js 的 SSOT 段必須與 exporter 輸出逐字相符。
 

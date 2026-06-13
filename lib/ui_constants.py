@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Dict
 
 from .specs import POWER_MA
+from .config import ROLE_PALETTE, ROLE_COLOR_UNKNOWN  # Wave B: role 色單一 SSOT
 
 # UI 端簡稱 → taxonomy -class 名稱
 UI_KEY_TO_CLASS: Dict[str, str] = {
@@ -67,9 +68,12 @@ UI_POWER_BUDGETS: Dict[str, int] = {
     "USB-5V": 500, "LiPo": 1500, "AA": 800, "DC-5V": 2000, "auto": 500,
 }
 
+# Wave B: 衍生自 ROLE_PALETTE（11 role 單一 SSOT）+ Unknown 降級;保留 'Output'
+# 別名（= Actuator 色，向後相容舊呼叫端，TAXONOMY 正名為 Actuator）。
 UI_ROLE_COLOR: Dict[str, str] = {
-    "Brain": "#4da6ff", "Power": "#ffcc00",
-    "Output": "#00ff88", "Sensor": "#ff88cc", "Unknown": "#888",
+    **ROLE_PALETTE,
+    "Output": ROLE_PALETTE["Actuator"],
+    "Unknown": ROLE_COLOR_UNKNOWN,
 }
 
 

@@ -19,9 +19,14 @@ class PinNeed:
     color: str = "#44cc44"
 
 
-COMP_PIN_NEEDS: dict[str, list[PinNeed]] = {
+# PB2: frozen hand golden. The runtime COMP_PIN_NEEDS is now DERIVED from verified.json
+# at the end of this module (pin_needs_from_datasheet). This dict is kept ONLY as the
+# equivalence golden — tests/test_pin_needs_derive.py asserts derived == this by (tag,type).
+# Do NOT consume _PIN_NEEDS_GOLDEN at runtime; add new components to verified.json +
+# comp_class_map instead (they then auto-derive).
+_PIN_NEEDS_GOLDEN: dict[str, list[PinNeed]] = {
     "NeoPixel":     [PinNeed("DIN",  "digital", "#44cc44")],
-    "LED_Single":   [PinNeed("+",    "digital", "#ff4444")],
+    "LED_Single":   [PinNeed("+",    "pwm",     "#ff4444")],  # CCR4: PWM-dimmable (analogWrite); digital pin would silently fail dimming
     "LED_RGB":      [PinNeed("R", "pwm", "#ff4444"),
                      PinNeed("G", "pwm", "#44cc44"),
                      PinNeed("B", "pwm", "#4488ff")],
@@ -66,6 +71,98 @@ COMP_PIN_NEEDS: dict[str, list[PinNeed]] = {
     "Bluetooth_HC05": [PinNeed("TX", "uart",    "#44cc44"),
                        PinNeed("RX", "uart",    "#ffaa00")],
 }
+
+
+# ── PB2: derive COMP_PIN_NEEDS from verified.json (Path B / D1) ──────────────
+# Goal: pin needs come from the SSOT pin_layout + wiring_hints, so any component with
+# a complete SSOT works for free input — no hand table to drift. Equivalence-gated:
+# tests/test_pin_needs_derive.py asserts derived (tag,type) == hand for every entry
+# before the hand COMP_PIN_NEEDS literal is retired.
+_SSOT_PATH = None
+_SSOT_CACHE = None
+
+
+def _load_ssot() -> dict:
+    global _SSOT_PATH, _SSOT_CACHE
+    if _SSOT_CACHE is None:
+        import json
+        from pathlib import Path
+        _SSOT_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "component_datasheet_verified.json"
+        _SSOT_CACHE = json.loads(_SSOT_PATH.read_text(encoding="utf-8"))
+    return _SSOT_CACHE
+
+
+# short → verified.json class (single source; no circular import — comp_class_map is a leaf)
+from .comp_class_map import SHORT_TO_CLASS as _SHORT_TO_CLASS  # noqa: E402
+_MCU_SHORTS = {"Arduino", "ESP32", "RPi", "Microbit"}
+_DERIVE_TYPEMAP = {"PWM": "pwm", "ANALOG": "analog", "I2C": "i2c", "SPI": "spi",
+                   "UART": "uart", "GPIO": "digital", "OTHER": "digital"}
+_DERIVE_SKIP_TYPES = {"PWR", "GND", "NC", "RELAY_CONTACT", "MOTOR", "USB", "AUDIO"}
+_DERIVE_PALETTE = ["#44cc44", "#ff4444", "#44aaff", "#ffaa00", "#b392f0"]
+
+# Thin justified overrides: components whose MCU pin needs are NOT a direct read of
+# their own pin_layout (mechanical→logical, driver-mediated, or no SSOT entry).
+_PIN_NEEDS_OVERRIDE: dict[str, list] = {
+    # SoftwareSerial on arbitrary digital pins (not HW UART) — MP3-Module/DFPlayer
+    "Speaker":  [PinNeed("TX", "digital"), PinNeed("RX", "digital")],
+    # Wired through L298N-Driver-class (Motor-DC-class itself is just M+/M-)
+    "DCMotor":  [PinNeed("ENA", "pwm"), PinNeed("IN1", "digital"), PinNeed("IN2", "digital")],
+    # Mechanical contacts → one logical INPUT_PULLUP signal
+    "Button":   [PinNeed("SIG", "digital")],
+    "Switch":   [PinNeed("SIG", "digital")],
+    # No verified.json entry yet (SSOT gap; kept as hand spec until added)
+    "SD_Card":  [PinNeed("SS", "spi"), PinNeed("MOSI", "spi"), PinNeed("MISO", "spi"), PinNeed("SCK", "spi")],
+    "GPS_Module": [PinNeed("TX", "uart"), PinNeed("RX", "uart")],
+    "Bluetooth_HC05": [PinNeed("TX", "uart"), PinNeed("RX", "uart")],
+}
+
+
+def pin_needs_from_datasheet(short: str):
+    """Derive [PinNeed] for a wiring short-name from verified.json pin_layout +
+    wiring_hints (mcu_pins filter / pwm_override / pin_aliases). Returns None when there
+    is no SSOT class to derive from (caller falls back to a thin override). Never returns
+    a silent empty list for a class that exists but has no signal pins — that surfaces as
+    an empty derive the equivalence gate will flag."""
+    if short in _PIN_NEEDS_OVERRIDE:
+        return [PinNeed(p.tag, p.type, p.color) for p in _PIN_NEEDS_OVERRIDE[short]]
+    cls = _SHORT_TO_CLASS.get(short)
+    spec = _load_ssot().get(cls) if cls else None
+    if spec is None:
+        return None
+    wh = spec.get("wiring_hints") or {}
+    mcu_pins = wh.get("mcu_pins")
+    pwm_over = set(wh.get("pwm_override") or [])
+    aliases = wh.get("pin_aliases") or {}
+    needs: list = []
+    for hg in (spec.get("pin_layout") or {}).get("header_groups", []) or []:
+        for p in hg.get("pins", []) or []:
+            name = p.get("name")
+            t = str(p.get("type", "")).upper()
+            if mcu_pins is not None:
+                if name not in mcu_pins:
+                    continue
+            elif t in _DERIVE_SKIP_TYPES:
+                continue
+            ptype = "pwm" if name in pwm_over else _DERIVE_TYPEMAP.get(t, "digital")
+            tag = aliases.get(name, name)
+            needs.append(PinNeed(tag, ptype, _DERIVE_PALETTE[len(needs) % len(_DERIVE_PALETTE)]))
+    return needs
+
+
+# ── PB2: COMP_PIN_NEEDS is now DERIVED (retires the hand table) ─────────────
+# Vocabulary = every component class in comp_class_map (minus the MCU brains) plus the
+# thin overrides. A new component with a complete verified.json entry + a comp_class_map
+# line auto-derives here — no hand-coding. Components with no MCU signal pin (e.g. Pump,
+# relay-mediated) derive to [] and are omitted. The frozen _PIN_NEEDS_GOLDEN above guards
+# this output via tests/test_pin_needs_derive.py (derived == golden by tag/type).
+_WIRING_SHORTS = sorted((set(_SHORT_TO_CLASS) - _MCU_SHORTS) | set(_PIN_NEEDS_OVERRIDE))
+COMP_PIN_NEEDS: dict[str, list] = {}
+for _s in _WIRING_SHORTS:
+    _needs = pin_needs_from_datasheet(_s)
+    if _needs:  # omit components with no MCU signal pin (derived empty)
+        COMP_PIN_NEEDS[_s] = _needs
+del _s, _needs
+
 
 # ── Taxonomy → Short Name Mapping ────────────────────────────
 # UI 送來的名稱格式：Sensor-SoilMoisture（已去掉 -class），

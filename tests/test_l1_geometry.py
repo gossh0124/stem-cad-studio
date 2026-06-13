@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from lib.verification import check_placement_collisions, Verdict
+from lib.verification import check_placement_collisions, placements_from_scene_graph, Verdict
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,7 +42,10 @@ class TestPlacementCollisions:
         assert rpt.verdict == Verdict.PASS
 
     def test_real_canned_no_overlap(self):
+        # component_placements (corner x/y/L/W) is deprecated; the pipeline now emits
+        # scene_graph_v3 (y-up 3D). Derive top-down placements from it via the adapter.
         b = json.loads((ROOT / "v6" / "canned" / "auto_waterer.json").read_text(encoding="utf-8"))
-        pls = b["cad_output"]["component_placements"]
+        pls = placements_from_scene_graph(b["cad_output"]["scene_graph_v3"])
+        assert pls, "scene_graph_v3 yielded no placements"
         rpt = check_placement_collisions(pls)
         assert rpt.verdict == Verdict.PASS, rpt.render_text()

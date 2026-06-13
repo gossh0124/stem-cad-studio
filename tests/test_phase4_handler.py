@@ -21,9 +21,14 @@ from services.phase_handlers.phase4_handler import (
     _resolve_brain_class,
     _merge_lora_b_into_solver,
     _safe_project_name,
-    _has_multi_component_layout,
     _SAFE_PROJECT_NAME_FALLBACK,
     Phase4Handler,
+)
+# §D2 (scene-graph builder salvage): phase4 多元件 gate 改 inline non_mount_count>=2;
+# has_multi_component_layout helper 仍在 _phase4_helpers(現為 dead-but-present)。
+# import 改向 helper 來源,測試續測 helper;新 inline gate 的單元覆蓋列 follow-up。
+from services.phase_handlers._phase4_helpers import (
+    has_multi_component_layout as _has_multi_component_layout,
 )
 
 

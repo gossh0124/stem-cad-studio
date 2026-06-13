@@ -271,13 +271,15 @@ class TestBuildModules:
         assert modules[0].comp_type == "Arduino-Uno-class"
         assert modules[1].comp_type == "Motor-Servo-class"
 
-    def test_batch_skips_unknown(self):
+    def test_batch_unknown_raises(self):
+        """No-Silent-Fallback: an unknown component must surface as a KeyError,
+        not be silently dropped from the assembly batch."""
         comps = [
             {"type": "Arduino-Uno-class", "role": "Brain"},
             {"type": "DOES-NOT-EXIST", "role": "X"},
         ]
-        modules = build_modules(comps)
-        assert len(modules) == 1
+        with pytest.raises(KeyError):
+            build_modules(comps)
 
     def test_batch_empty_input(self):
         assert build_modules([]) == []

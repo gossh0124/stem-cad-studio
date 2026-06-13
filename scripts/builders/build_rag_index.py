@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # scripts/builders/ → repo root (3 levels)
 sys.path.insert(0, str(_PROJECT_ROOT))
 sys.path.insert(0, str(_PROJECT_ROOT / "lib"))
 sys.path.insert(0, str(_PROJECT_ROOT / "training"))
@@ -30,6 +30,20 @@ def _build_components(force: bool):
     t0 = time.time()
     build_component_index(force=force)
     print(f"      完成 ({time.time() - t0:.1f}s)")
+
+
+class RagIngestError(RuntimeError):
+    """灌入過程中有記錄失敗時拋出，避免「部分/空索引」被當成成功建置。"""
+
+
+# 累計各灌入階段的失敗筆數；main() 在結尾檢查，任一筆失敗即以非零退出，
+# 避免「部分/空索引」被自動化/CI 誤判為成功建置。
+_INGEST_FAILURES: list[tuple[str, int]] = []
+
+
+def _record_failures(stage: str, failures: int) -> None:
+    if failures:
+        _INGEST_FAILURES.append((stage, failures))
 
 
 def _build_canned_cases() -> int:
@@ -52,6 +66,7 @@ def _build_canned_cases() -> int:
 
     print("[canned] 掃描 v6/canned/ 精校案例...")
     count = 0
+    failures = 0
     for fp in sorted(canned_dir.glob("*.json")):
         if fp.name == "_index.json":
             continue
@@ -63,9 +78,11 @@ def _build_canned_cases() -> int:
             print(f"  [canned] {pname} ({len(comps)} comps)")
             count += 1
         except Exception as e:
+            failures += 1
             print(f"  [WARN] {fp.name}: {e}")
 
     print(f"[canned] 完成 {count} 筆")
+    _record_failures("canned", failures)
     return count
 
 
@@ -78,6 +95,7 @@ def _build_synthetic_cases(n: int):
     gen = DataGenerator()
     t0 = time.time()
     count = 0
+    failures = 0
     for i in range(n):
         try:
             sample = gen._build_sample(i)
@@ -89,8 +107,10 @@ def _build_synthetic_cases(n: int):
             add_case(bridge, case_id=f"synthetic_{i:04d}")
             count += 1
         except Exception as e:
+            failures += 1
             print(f"      [WARN] case {i} failed: {e}")
     print(f"      完成 {count}/{n} 筆 ({time.time() - t0:.1f}s)")
+    _record_failures("synthetic", failures)
 
 
 def _build_synthetic_assembly(n: int):
@@ -103,6 +123,7 @@ def _build_synthetic_assembly(n: int):
     t0 = time.time()
     samples = gen.generate_synthetic_data(n)
     count = 0
+    failures = 0
     for i, sample in enumerate(samples):
         try:
             completion_text = sample["completion"]
@@ -126,8 +147,10 @@ def _build_synthetic_assembly(n: int):
             add_assembly(plan, fake_bridge, assembly_id=f"synthetic_asm_{i:04d}")
             count += 1
         except Exception as e:
+            failures += 1
             print(f"      [WARN] assembly {i} failed: {e}")
     print(f"      Done {count}/{n} ({time.time() - t0:.1f}s)")
+    _record_failures("synthetic_asm", failures)
 
 
 def _ingest_from_state():
@@ -147,6 +170,7 @@ def _ingest_from_state():
 
     print(f"[state] 從 {state_dir} 灌入歷史案例...")
     count = 0
+    failures = 0
     for fp in state_dir.glob("*.json"):
         try:
             bridge = json.loads(fp.read_text(encoding="utf-8"))
@@ -165,8 +189,10 @@ def _ingest_from_state():
                 add_assembly(plan, bridge, assembly_id=f"hist_{fp.stem}")
             count += 1
         except Exception as e:
+            failures += 1
             print(f"  [WARN] {fp.name}: {e}")
     print(f"      灌入 {count} 筆歷史案例")
+    _record_failures("state", failures)
 
 
 def _show_status():
@@ -233,6 +259,15 @@ def main():
         _ingest_from_state()
 
     _show_status()
+
+    # 任一筆灌入失敗即視為建置失敗：避免部分/空索引被自動化誤判為成功。
+    if _INGEST_FAILURES:
+        detail = ", ".join(f"{stage}={n}" for stage, n in _INGEST_FAILURES)
+        total = sum(n for _, n in _INGEST_FAILURES)
+        raise RagIngestError(
+            f"RAG 灌入有 {total} 筆失敗 ({detail})；索引可能不完整，"
+            f"請檢視上方 [WARN] 訊息後重建。"
+        )
 
 
 if __name__ == "__main__":

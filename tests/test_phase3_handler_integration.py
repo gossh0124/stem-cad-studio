@@ -171,12 +171,14 @@ class TestExecuteIntegration:
             _make_comp("Display", "Display-OLED-class"),  # 3.3V needs LDO
         ]
         bridge = _basic_bridge(comps)
-        result_bridge, _ = handler.execute(basic_job, bridge, None)
 
-        # LDO should be injected
-        types = [c.get("type") for c in result_bridge["components"]]
-        assert "LDO-3V3-class" in types
-        assert result_bridge["power_budget"]["needs_ldo"] is True
+        # No-Silent-Fallback: a spec-less LDO would be absent from the already
+        # computed BOM / power_budget / geometry (those skip spec-less comps),
+        # causing components<->BOM divergence (SSOT). The handler must refuse to
+        # silently inject it and fail loudly instead.
+        with pytest.raises(ValueError) as excinfo:
+            handler.execute(basic_job, bridge, None)
+        assert "LDO-3V3-class" in str(excinfo.value)
 
     @patch("services.phase_handlers.base._raw_save_bridge")
     @patch("services.phase_handlers.phase3_handler._calculate_bom")

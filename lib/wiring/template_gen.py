@@ -47,6 +47,15 @@ _DS_TO_SHORT: dict[str, str] = {
 # 反向映射：short name → datasheet key
 _SHORT_TO_DS: dict[str, str] = {v: k for k, v in _DS_TO_SHORT.items()}
 
+# A4-A: 供電件不是「接線耗電端」。它們的 PWR pin(voltage_domain=3V/5V)描述的是
+# *輸出*電壓,若誤走 template_from_datasheet 會被當成 vcc 而生成耗電 template
+# (把電源當被供電元件)。前端 _injectPower 才是電源接入的正確路徑。此處 fail-loud,
+# 不靜默回傳錯誤 consumer template。
+_POWER_SOURCE_CLASSES: frozenset[str] = frozenset({
+    "Battery-AA-class", "Battery-LiPo-class", "USB-5V-class",
+    "AC-Adapter-class", "USB-Adapter-class",
+})
+
 # Pin type → PinNeed type 映射
 _PIN_TYPE_MAP: dict[str, str] = {
     "PWM": "pwm",
@@ -76,25 +85,7 @@ _DIRECTION_NOTES: dict[str, str] = {
     "other": "",
 }
 
-# ── 跨元件接線規則 ──────────────────────────────────────────────
-CROSS_WIRING_RULES: dict[tuple[str, str], dict[str, Any]] = {
-    # Pump 由 Relay COM/NO 供電
-    ("Pump", "Relay"): {
-        "from_pin": "VCC",
-        "to_pin": "COM",
-        "note": "由繼電器 COM/NO 供電",
-    },
-    # DFPlayer SPK 接外部喇叭
-    ("Speaker", "Speaker_ext"): {
-        "from_pins": ["SPK1", "SPK2"],
-        "note": "接 8Ω 喇叭",
-    },
-    # L298N 外部 12V
-    ("DCMotor", "ExternalPower"): {
-        "from_pin": "+12V",
-        "note": "外部 12V 馬達電源",
-    },
-}
+# （CROSS_WIRING_RULES 已移除：dead-code，無呼叫點；跨元件接線邏輯實作於 WireExtra）
 
 # ── Datasheet 快取 ──────────────────────────────────────────────
 _datasheet_cache: dict | None = None
@@ -196,6 +187,12 @@ def template_from_datasheet(comp_key: str) -> WiringTemplate | None:
             return None
 
     comp_data = ds[ds_key]
+    # A4-A: power sources cannot be wired as consumers (their PWR pin is an OUTPUT).
+    if ds_key in _POWER_SOURCE_CLASSES:
+        raise ValueError(
+            f"{ds_key} is a power source, not a wiring consumer — its PWR pin is an "
+            "output; power must be injected via the frontend _injectPower path, not "
+            "derived as a vcc consumer template")
     short_name = _DS_TO_SHORT.get(ds_key, comp_key)
     pins = _collect_pins(comp_data)
 
@@ -215,44 +212,51 @@ def template_from_datasheet(comp_key: str) -> WiringTemplate | None:
     # 決定 decoupling
     decoupling = hints.get("decoupling")
 
-    # 建構 WireExtra 列表
+    # 建構 WireExtra 列表。PB3：套用與 pin_needs_from_datasheet 相同的 wiring_hints 欄位
+    # (mcu_pins 白名單 / pin_aliases 改名),讓 wiring-template 與 pin-needs 兩條 derive
+    # 路徑一致 → 多數 _COMP_OVERRIDES 不再需要(可退役)。
     extras: list[WireExtra] = []
+    mcu_pins = hints.get("mcu_pins")
+    aliases = hints.get("pin_aliases") or {}
+    _SKIP_TYPES = {"GND", "PWR", "NC", "RELAY_CONTACT", "MOTOR", "USB", "AUDIO"}
 
     for pin in pins:
         pin_type = pin.get("type", "")
         pin_name = pin.get("name", "")
         direction = pin.get("direction", "")
 
-        # Rule 2: GND → 跳過（engine.py 自動加）
-        if pin_type == "GND":
-            continue
-        # Rule 1: PWR → 跳過（已處理為 vcc）
-        if pin_type == "PWR":
-            continue
-        # Rule 3: NC → 跳過
-        if pin_type == "NC":
+        if mcu_pins is not None:
+            if pin_name not in mcu_pins:
+                continue
+        elif pin_type in _SKIP_TYPES:
             continue
 
-        # Rule 4: 其他 pin → WireExtra
         note = _note_from_direction(direction)
-        passive = _find_passive(pin_name, hints)
-
+        passive = _find_passive(pin_name, hints)   # passive keyed on the SSOT pin name
+        tag = aliases.get(pin_name, pin_name)
         extras.append(WireExtra(
-            comp=pin_name,
-            tag=pin_name,
+            comp=tag,
+            tag=tag,
             note=note,
             passive=passive,
         ))
 
-    # Rule 6: cross_component → 額外 WireExtra with fixed
+    # Rule 6: cross_component → 額外 WireExtra with fixed。
+    # target_pin（如 Relay 的 "NO"）必須併入 fixed，否則只落在普通 "Relay" 網而非
+    # "Relay.NO" contact net（netlist.py 以 "." 判定接點），galvanic-isolation post-pass
+    # 不會觸發。SSOT 既已宣告 target_pin，這裡不得靜默丟棄（DEC-H7）。無 target_pin 者
+    # （L298N→ExternalPower、Relay→EXT-PWR/LOAD+、MP3→Speaker）行為不變。
     for cross in hints.get("cross_component", []):
+        _target = cross.get("target_comp", "EXT")
+        _tpin = cross.get("target_pin")
+        _fixed = f"{_target}.{_tpin}" if _tpin else _target
         for cpin in cross.get("pins", []):
             extras.append(WireExtra(
                 comp=cpin,
                 tag=None,
                 note=cross.get("note", ""),
                 color=cross.get("color", "#ff88cc"),
-                fixed=cross.get("target_comp", "EXT"),
+                fixed=_fixed,
             ))
 
     return WiringTemplate(
@@ -277,6 +281,10 @@ _COMP_OVERRIDES: dict[str, dict[str, Any]] = {
             WireExtra("IN1", "IN1", "方向控制 A1"),
             WireExtra("IN2", "IN2", "方向控制 A2"),
             WireExtra("+12V", None, "外部 12V 電源", "#ff2200", "EXT"),
+            # C(#8): L298N 馬達輸出 → 馬達端子 M1/M2（負載側，比照 Relay COM/NO 用 fixed；
+            # 用 M1/M2 避開 netlist _GROUND_RAILS 含 'M-' 的接地誤分類）
+            WireExtra("OUT1", None, "馬達輸出 → 馬達端子 M1", "#ff6600", "M1"),
+            WireExtra("OUT2", None, "馬達輸出 → 馬達端子 M2", "#ff6600", "M2"),
         ],
     },
     "Stepper": {
@@ -293,7 +301,7 @@ _COMP_OVERRIDES: dict[str, dict[str, Any]] = {
         "label": "微型水泵（透過繼電器控制）",
         "vcc": None,
         "extras": [
-            WireExtra("VCC", None, "由 Relay COM/NO 供電", "#ff8800", "Relay.COM"),
+            WireExtra("VCC", None, "由 Relay NO 切換供電（外接電源接 COM）", "#ff8800", "Relay.NO"),
         ],
     },
     "Speaker": {
@@ -384,14 +392,30 @@ _COMP_OVERRIDES: dict[str, dict[str, Any]] = {
     "Relay": {
         "label": "5V 單路繼電器",
         "vcc": "5V",
-        # datasheet 含 relay 觸點 COM/NO/NC，實際只接 IN 控制 + COM 負載
+        # A4-B: 觸點負載側必須完整呈現切換迴路。控制側 IN(LOW 觸發)+ 線圈電源(VCC/GND
+        # engine 自動加);觸點側 COM(公共,接外部電源)+ NO(常開,接負載) → 外部供電
+        # 經 COM→NO→負載 形成迴路。NC(常閉)此模組預設不接。flyback D1 已板載(on_board
+        # D1=1N4007),勿外加。
         "extras": [
             WireExtra("IN", "IN", "LOW 觸發"),
-            WireExtra("COM", None, "公共接點", "#ff8800", "LOAD"),
+            WireExtra("COM", None, "公共接點 ← 外部電源", "#ff8800", "EXT-PWR"),
+            WireExtra("NO", None, "常開接點 → 負載", "#ff6600", "LOAD+"),
         ],
         "decoupling": "100nF",
     },
 }
+
+# PB3: these 8 overrides are now FULLY derived from verified.json (template_from_datasheet
+# honours mcu_pins + pin_aliases, and the fabricated LDR divider was removed from SSOT) —
+# proven equivalent and retired. The literals above are kept as documented reference but
+# are inactive at runtime (popped here). tests/test_wiring_overrides_retired.py guards that
+# get_template output is unchanged for these. Genuine remaining exceptions: DCMotor (L298N
+# driver indirection), Pump (Relay.NO switched-output target), Speaker (SoftwareSerial + SPK),
+# Button/Switch (mechanical contacts → logical SIG), Relay (COM/NO load side semantics).
+for _retired in ("Stepper", "LED_Single", "LED_RGB", "Light", "Servo", "SoilMoisture",
+                 "MSGEQ7", "Relay"):  # Relay: COM/NO load side moved to SSOT cross_component (PB3)
+    _COMP_OVERRIDES.pop(_retired, None)
+del _retired
 
 
 def _apply_override(short_name: str, tmpl: WiringTemplate | None) -> WiringTemplate | None:
@@ -451,14 +475,19 @@ def get_template(comp_key: str) -> WiringTemplate | None:
     if tmpl:
         return tmpl
 
-    # Layer 2: RAG — 語義搜尋最相似元件的 pin pattern
+    # Layer 2: RAG — 語義搜尋最相似元件的 pin pattern。
+    # RAG 是選用層：模組本身或其選用依賴(lancedb 等向量後端)缺席時屬「預期降級」，
+    # 應靜默 fall-through 回 None(unknown→None 契約)。RAG 的延遲 import 發生在 call 時,
+    # 故 ImportError/ModuleNotFoundError 需涵蓋 import 與 infer_template() 執行兩階段。
+    # 注意:此處只吞 (Module)ImportError——其餘真實邏輯錯誤仍向上拋,不靜默掩蓋。
     try:
         from ..rag.rag_wiring import infer_template
         tmpl = infer_template(comp_key)
+    except ImportError as exc:
+        _log.debug("RAG wiring unavailable for %s (optional dep missing): %s", comp_key, exc)
+    else:
         if tmpl:
             _log.info("template[%s] source=rag_inferred", comp_key)
             return tmpl
-    except Exception as exc:
-        _log.debug("RAG wiring inference failed for %s: %s", comp_key, exc)
 
     return None

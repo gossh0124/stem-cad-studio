@@ -20,7 +20,7 @@ class TestCalculateBom:
         assert len(result.rows) == 1
 
     def test_qty_multiplies(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 3}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 3}]
         result = calculate_bom(comps)
         row = result.rows[0]
         assert row["total_ma"] == row["unit_ma"] * 3
@@ -28,14 +28,14 @@ class TestCalculateBom:
 
     def test_power_component_sets_supply(self):
         comps = [
-            {"type": "Battery-9V-class", "role": "Power", "qty": 1},
-            {"type": "LED-class", "role": "Display", "qty": 1},
+            {"type": "Battery-AA-class", "role": "Power", "qty": 1},
+            {"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1},
         ]
         result = calculate_bom(comps)
-        assert result.power_type == "Battery-9V-class"
+        assert result.power_type == "Battery-AA-class"
 
     def test_default_power_type_usb(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result = calculate_bom(comps)
         assert result.power_type == "USB-5V-class"
 
@@ -49,25 +49,24 @@ class TestCalculateBom:
     def test_multiple_components_sum(self):
         comps = [
             {"type": "Motor-Servo-class", "role": "Actuator", "qty": 1},
-            {"type": "LED-class", "role": "Display", "qty": 2},
+            {"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 2},
         ]
         result = calculate_bom(comps)
         expected = sum(r["total_ma"] for r in result.rows)
         assert abs(result.total_ma - expected) < 0.01
 
-    def test_unknown_type_gets_defaults(self):
+    def test_unknown_type_raises(self):
         comps = [{"type": "NonExistentSensor-XYZ", "role": "Sensor", "qty": 1}]
-        result = calculate_bom(comps)
-        assert result.rows[0]["unit_ma"] == 50.0
-        assert result.rows[0]["unit_ntd"] == 100
+        with pytest.raises(ValueError):
+            calculate_bom(comps)
 
     def test_label_falls_back_to_type(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result = calculate_bom(comps)
-        assert result.rows[0]["label"] == "LED-class"
+        assert result.rows[0]["label"] == "Lighting-LED-RGB-class"
 
     def test_label_uses_provided(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1, "label": "Red LED"}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1, "label": "Red LED"}]
         result = calculate_bom(comps)
         assert result.rows[0]["label"] == "Red LED"
 
@@ -147,14 +146,14 @@ class TestCalculateBomPassives:
 
     # ── 測試：無 wiring 時行為不變（向後相容）──────────────────
     def test_no_wiring_no_passive_rows(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result = calculate_bom(comps)
         passive_rows = [r for r in result.rows if r.get("role") == "Passive"]
         assert passive_rows == []
 
     # ── 測試：被動行存在 ────────────────────────────────────────
     def test_passive_row_appended(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result = calculate_bom(comps, wiring=self._wiring_external)
         passive_rows = [r for r in result.rows if r.get("role") == "Passive"]
         assert len(passive_rows) == 1
@@ -162,7 +161,7 @@ class TestCalculateBomPassives:
 
     # ── 測試：被動零功耗 ────────────────────────────────────────
     def test_passive_zero_power(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result = calculate_bom(comps, wiring=self._wiring_external)
         for row in result.rows:
             if row.get("role") == "Passive":
@@ -171,14 +170,14 @@ class TestCalculateBomPassives:
 
     # ── 測試：total_ma 不因被動改變（回歸保護）──────────────────
     def test_total_ma_unchanged_by_passives(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result_no_wiring = calculate_bom(comps)
         result_with_wiring = calculate_bom(comps, wiring=self._wiring_external)
         assert result_no_wiring.total_ma == result_with_wiring.total_ma
 
     # ── 測試：onboard 不計成本（qty=0, total_ntd=0, note='已含於模組'）
     def test_onboard_passive_not_purchasable(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result = calculate_bom(comps, wiring=self._wiring_onboard)
         passive_rows = [r for r in result.rows if r.get("role") == "Passive"]
         assert len(passive_rows) == 1
@@ -190,14 +189,14 @@ class TestCalculateBomPassives:
 
     # ── 測試：onboard 不計入 total_ntd ──────────────────────────
     def test_onboard_not_counted_in_total_ntd(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result_no_wiring = calculate_bom(comps)
         result_with_onboard = calculate_bom(comps, wiring=self._wiring_onboard)
         assert result_no_wiring.total_ntd == result_with_onboard.total_ntd
 
     # ── 測試：external 計入 total_ntd ───────────────────────────
     def test_external_passive_counted_in_total_ntd(self):
-        comps = [{"type": "LED-class", "role": "Display", "qty": 1}]
+        comps = [{"type": "Lighting-LED-RGB-class", "role": "Display", "qty": 1}]
         result_no_wiring = calculate_bom(comps)
         result_with_ext = calculate_bom(comps, wiring=self._wiring_external)
         assert result_with_ext.total_ntd > result_no_wiring.total_ntd

@@ -54,11 +54,14 @@ def role_stats(role: str) -> Dict[str, Dict[str, float]]:
     for tk in type_keys:
         spec = COMPONENT_REGISTRY.get(tk)
         if spec is None:
-            _log.warning(
-                "taxonomy/registry out of sync: type_key %r (role=%r) not found"
-                " in COMPONENT_REGISTRY", tk, role
+            # registry_data import-time cross-check (H21) should have caught this;
+            # reaching here means COMPONENT_REGISTRY or TAXONOMY_CONFIG was mutated
+            # post-import (e.g. test monkey-patch). Raise loud — no silent stats skip.
+            raise RuntimeError(
+                f"taxonomy/registry internal inconsistency: type_key {tk!r}"
+                f" (role={role!r}) missing from COMPONENT_REGISTRY after"
+                " import-time cross-check. Was COMPONENT_REGISTRY mutated?"
             )
-            continue
         for f in _VALIDATE_FIELDS:
             v = getattr(spec, f, None)
             if v is not None and v > 0:

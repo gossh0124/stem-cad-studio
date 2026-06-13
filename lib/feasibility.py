@@ -79,6 +79,24 @@ def _ds_min_voltage(class_name: str) -> float | None:
 
 
 # ---------------------------------------------------------------------------
+# 電源兩域常數
+# ---------------------------------------------------------------------------
+
+# 負載電源偵測（複用後端兩域模型 reference_power_topology_wiring_standard）：
+# 電流 ≥ 此值或 datasheet notes 明示須 driver → 需外接電源經 driver/relay，不可 MCU 腳直驅。
+_LOAD_POWER_CURRENT_MA = 200.0
+_LOAD_POWER_NOTE_KEYS = (
+    "cannot drive", "requires relay", "requires h-bridge",
+    "requires driver", "h-bridge driver", "mosfet for mcu",
+)
+_DRIVER_TYPE_KEYS = ("relay", "l298n", "l293", "driver", "uln2003", "tb6612", "mosfet")
+# bridge role 命名雙慣例（測試 fixture 用 'mcu'/'power'、canned state 用 'Brain'/'Power'）→
+# role 不可靠時用 type 關鍵字 fallback，避免漏判（曾因只認 'Brain' 而生產 no-op）。
+_BRAIN_TYPE_KEYS = ("arduino", "esp32", "esp8266", "microbit", "micro:bit", "raspberry", "rpi")
+_POWER_TYPE_KEYS = ("battery", "usb-5v", "usb5v", "usb-adapter", "ac-adapter")
+
+
+# ---------------------------------------------------------------------------
 # 2. 意圖偵測輔助函式
 # ---------------------------------------------------------------------------
 
@@ -120,6 +138,11 @@ def _check_capability(bridge: dict) -> list[dict]:
 
     for rule in CAPABILITY_RULES:
         if not _detect_intent(instruction, rule["intent_patterns"]):
+            continue
+        # exclude_patterns(negative-guard):意圖命中排除樣式 → 跳過此規則。
+        # 例:CAP-001 的 行走/前進/走路 會掃到足式步行,但雙足/四足用伺服做「關節角度控制」
+        # (伺服正確用途,非驅動輪)→ 以 雙足/walker/腿 等排除,避免偽陽性 error。
+        if rule.get("exclude_patterns") and _detect_intent(instruction, rule["exclude_patterns"]):
             continue
         for comp in components:
             comp_type = comp.get("type", comp.get("selected_type", ""))
@@ -257,6 +280,116 @@ def _check_energy_runtime(bridge: dict) -> list[dict]:
     return issues
 
 
+def _comp_type(comp: dict) -> str:
+    return comp.get("type", comp.get("selected_type", "")) or ""
+
+
+def _is_brain(comp: dict) -> bool:
+    if (comp.get("role") or "").lower() in ("brain", "mcu"):
+        return True
+    t = _comp_type(comp).lower()
+    return any(k in t for k in _BRAIN_TYPE_KEYS)
+
+
+def _is_power(comp: dict) -> bool:
+    if (comp.get("role") or "").lower() == "power":
+        return True
+    t = _comp_type(comp).lower()
+    return any(k in t for k in _POWER_TYPE_KEYS)
+
+
+def _ds_needs_load_power(class_name: str) -> bool:
+    """SSOT 判斷：元件是否需負載電源（高電流 → 不可由 MCU 腳直驅，須外接電源經 driver/relay）。
+
+    優先看 datasheet electrical.notes（權威：「cannot drive from GPIO」「requires driver」），
+    再回退電流門檻（≥200mA;排除 PIR 65mA / 小 LED 等由 VCC 軌供電的邏輯件）。
+    """
+    elec = _ds_electrical(class_name)
+    notes = (elec.get("notes") or "").lower()
+    if any(k in notes for k in _LOAD_POWER_NOTE_KEYS):
+        return True
+    cur = elec.get("current_typ_ma") or elec.get("current_max_ma")
+    return cur is not None and cur >= _LOAD_POWER_CURRENT_MA
+
+
+def _check_power_domain(bridge: dict) -> list[dict]:
+    """
+    檢查 4：電源兩域可行性（複用後端 power_inject SSOT，把後端可行性結論以教學語言呈現給學生）。
+
+    (1) MCU 電源相容（邏輯域）：電源能否供 MCU。不可行＋無 driver → error（電壓不符）;
+        不可行＋有 driver → warning（此電源實為負載電源，MCU 另需 USB）。
+    (2) 負載電源需求（負載域）：高電流元件（B 類）需外接電源經 driver/relay，缺則 warning。
+    """
+    issues: list[dict] = []
+    components = bridge.get("components", [])
+    brain = next((c for c in components if _is_brain(c)), None)
+    power = next((c for c in components if _is_power(c)), None)
+    if brain is None:
+        return issues
+    brain_type = _comp_type(brain)
+    types = [_comp_type(c) for c in components]
+    has_driver = any(any(k in t.lower() for k in _DRIVER_TYPE_KEYS) for t in types)
+
+    # (1) MCU 電源相容（邏輯域）— 複用後端 derive_power_injection（同 SSOT）
+    if power is not None:
+        power_type = power.get("type", power.get("selected_type", ""))
+        try:
+            from .wiring.power_inject import derive_power_injection
+            derive_power_injection(brain_type, power_type)
+        except Exception:  # noqa: BLE001 — 不可行（電壓不符 / 查無）
+            if has_driver:
+                issues.append({
+                    "component": power_type,
+                    "severity": "warning",
+                    "issue": f"{power_type} 電壓不足以供 {brain_type}（邏輯電源）",
+                    "why": (
+                        f"{power_type} 的輸出電壓無法供 {brain_type} 本體運作。本專案有繼電器/驅動板，"
+                        f"此電源應作為「負載電源」——經繼電器/驅動板供高電流元件（如馬達、泵），"
+                        f"而 {brain_type} 本身需另接 USB 邏輯電源。這是電路的兩種電源域（邏輯 vs 負載）。"
+                    ),
+                    "suggested_fix": (
+                        f"確認 {brain_type} 由 USB 供電;此電源接繼電器 COM / 驅動板電源端（負載側），與 MCU 共地。"
+                    ),
+                })
+            else:
+                issues.append({
+                    "component": power_type,
+                    "severity": "error",
+                    "issue": f"{power_type} 無法供 {brain_type}（電壓不符）",
+                    "why": (
+                        f"{power_type} 的輸出電壓不在 {brain_type} 的電源輸入範圍內，"
+                        f"直接供電會無法開機或損壞。"
+                    ),
+                    "suggested_fix": (
+                        f"改用 USB-5V-class（{brain_type} 最佳供電）;"
+                        f"或換用相容的 MCU（如 2×AA 3V 適合 micro:bit）。"
+                    ),
+                })
+
+    # (2) 負載電源需求（負載域）— 高電流元件須外接電源經 driver/relay
+    for comp in components:
+        if _is_brain(comp) or _is_power(comp):
+            continue
+        ctype = _comp_type(comp)
+        if not ctype or has_driver or not _ds_needs_load_power(ctype):
+            continue
+        cur = _ds_electrical(ctype).get("current_typ_ma") or _ds_electrical(ctype).get("current_max_ma")
+        issues.append({
+            "component": ctype,
+            "severity": "warning",
+            "issue": f"{ctype} 電流過高（約 {cur}mA），需外接電源經驅動板/繼電器",
+            "why": (
+                f"{ctype} 約需 {cur}mA，超過 MCU GPIO 每腳上限（約 40mA），"
+                f"不可由 MCU 腳直接供電，否則會燒壞 I/O。"
+            ),
+            "suggested_fix": (
+                "加入 Relay-Module-class（開關控制）或 L298N-Driver-class（馬達調速），"
+                "並用外接電源（電池/變壓器）供其負載側，與 MCU 共地。"
+            ),
+        })
+    return issues
+
+
 # ---------------------------------------------------------------------------
 # 3. 缺少能力檢查函式
 # ---------------------------------------------------------------------------
@@ -358,6 +491,7 @@ def check_feasibility(bridge: dict) -> list[dict]:
     issues: list[dict] = []
     issues.extend(_check_capability(bridge))
     issues.extend(_check_energy_runtime(bridge))
+    issues.extend(_check_power_domain(bridge))
     issues.extend(
         check_missing_capabilities(
             bridge.get("_instruction", ""),

@@ -39,8 +39,23 @@ _SEN_LABELS = {
     "PIR": "HC-SR501\nPIR", "SoilMoisture": "Soil\nSensor",
     "Light": "LDR\nPhoto",
 }
-_POWER_LABELS = {"LiPo": "LiPo 3.7V", "USB-5V": "USB 5V", "AA": "AA 電池",
-                 "DC-5V": "DC 5V 2A", "auto": "USB 5V"}
+# power 短名 → 顯示標籤。兩種詞彙都會流進這裡：bake 走 _POWER_KEY 的 UI 短名
+# (USB-5V/LiPo/AA/DC-5V)；phase3(真實 pipeline)走 normalize_comp 的 class-衍生短名
+# (Battery-AA/Battery-LiPo/AC-Adapter/USB-Adapter/USB-Buck-5V/LiPo-Charger/BatteryHolder-AA)。
+# 兩者皆須有正確標籤，否則電池/AC 供電專案會 fallback 成「USB 5V」(silent mislabel —
+# 先前 7/8 電源 class 在 phase3 都被誤標 USB 5V)。class-衍生短名的標籤語意對齊 bake _POWER_KEY。
+# 防漂移：tests/test_schematic_power_label.py 釘住「每個電源 source class 經 normalize_comp
+# 都有非-fallback 標籤」。(詞彙統一為單一源屬 finding 2，另案。)
+_POWER_LABELS = {
+    # UI 短名(bake _POWER_KEY 值 / 前端)
+    "LiPo": "LiPo 3.7V", "USB-5V": "USB 5V", "AA": "AA 電池",
+    "DC-5V": "DC 5V 2A", "auto": "USB 5V",
+    # class-衍生短名(phase3 normalize_comp 輸出)
+    "Battery-AA": "AA 電池", "BatteryHolder-AA": "AA 電池", "Battery-4AA": "6V 4×AA 電池",
+    "Battery-LiPo": "LiPo 3.7V", "LiPo-Charger": "LiPo 3.7V",
+    "AC-Adapter": "DC 5V 2A",
+    "USB-Adapter": "USB 5V", "USB-Buck-5V": "USB 5V",
+}
 _NON_DATA_MCUS = {"GND", "5V", "3.3V", "EXT", "SPK", "SPK-", "LOAD"}
 
 _SVG_NS = "http://www.w3.org/2000/svg"
@@ -132,7 +147,14 @@ def generate_svg(brain: str, power: str,
         txt.text = ln
 
     # ── Power rail ──
-    pwr_label = _POWER_LABELS.get(power, "USB 5V")
+    # no-silent-fallback (a)：未知/不適配電源是**無效設計輸入**（每個專案都應有適配電源），
+    # 不得靜默偽裝成「USB 5V」、也不渲染「未知電源」標籤 → fail-before-render（raise）。
+    # 已知電源（含 phase3 class-衍生短名）由 _POWER_LABELS 正確標示；API 層轉 422。
+    pwr_label = _POWER_LABELS.get(power)
+    if pwr_label is None:
+        raise ValueError(
+            f"未知/不適配的電源源 {power!r}：每個專案須指定適配電源"
+            f"（USB-5V / LiPo / AA / DC-5V 或對應電源 class）")
     pwr_rect = ET.SubElement(root, "rect", {
         "x": str(_MCU_X + 10), "y": "14",
         "width": str(_MCU_W - 20), "height": "24", "rx": "4",

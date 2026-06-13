@@ -17,9 +17,6 @@ from .packing import (
 from .wiring import _extract_component_pairs, _route_wires
 from .bus_routing import optimize_bus_routing
 from .thermal import _validate_thermal
-from .placement_dag import (
-    build_placement_dag, topological_sort_layers, compute_placement_order,
-)
 
 # Backward-compat re-exports (used by tests and assembly_solver_v3)
 from ._types import _CLEARANCE_MM, _THERMAL_HOT_MW, _VENT_THRESHOLD_MW  # noqa: F401
@@ -90,7 +87,16 @@ def solve(
             inner_w = new_enc["inner_width"]
             inner_h = new_enc["inner_height"]
             if changed:
-                _pack_shelf_ffd(pack_comps, inner_l, inner_w, decisions)
+                max_y, util = _pack_shelf_ffd(pack_comps, inner_l, inner_w, decisions)
+                # 升級+加大外殼後必須驗證確實已消化溢出;若 resize 公式成長不足,
+                # 殼體仍會溢出但無第二次升級 — 此處改為大聲失敗,不再靜默放行。
+                if util > 100 or max_y > inner_w:
+                    raise ValueError(
+                        "overflow_escalate 後重新 packing 仍溢出殼體:"
+                        f"util={util:.1f}% (>100) 或 max_y={max_y:.1f}mm "
+                        f"> inner_width={inner_w:.1f}mm。enclosure resize 成長不足,"
+                        "需更大外殼或更積極的升級策略。"
+                    )
         _check_collisions(pack_comps, decisions, inner_l, inner_w, inner_h)
         _check_cog(thermo_scope, inner_l, inner_w, decisions)
 
@@ -113,8 +119,14 @@ def solve(
             host_l = dims.get("length_mm", inner_l)
             host_w = dims.get("width_mm", inner_w)
             # u/v -> absolute mm on host face
-            c.x = round(ep.get("u", 0.5) * host_l, 1)
-            c.y = round(ep.get("v", 0.5) * host_w, 1)
+            # H7/NSF: missing u/v must fail loud, not silent-center at 0.5.
+            if "u" not in ep or "v" not in ep:
+                raise ValueError(
+                    f"{c.type}: embedded host_structure.entry_port 缺少 u/v "
+                    f"(got {ep!r})，拒絕靜默置中 0.5"
+                )
+            c.x = round(ep["u"] * host_l, 1)
+            c.y = round(ep["v"] * host_w, 1)
             c.face_out = ep.get("face", "top")
             c.zone = f"embedded-{hs.get('kind', 'host')}"
         else:

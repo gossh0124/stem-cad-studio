@@ -47,6 +47,18 @@ ENCLOSURE_SIZE_THRESHOLDS = {
 AREA_COMPACT_MAX_MM2 = 8000
 AREA_MEDIUM_MAX_MM2 = 20000
 
+# ROLE_PALETTE — role → UI 顏色 單一 SSOT（11 role 對齊 TAXONOMY_CONFIG core+aux）。
+# Wave B：取代散落各檔的平行手填色表（UI_ROLE_COLOR / ROLE_COLOR / scene-3d ROLE_RGB
+# / assembly-v3 ROLE_COLORS / _phase5 _ROLE_COLORS）。缺角色降級走 ROLE_COLOR_UNKNOWN
+# （顯式 Unknown 灰，非靜默沿用相鄰色；VS-FALLBACK(b)）。
+ROLE_PALETTE: Dict[str, str] = {
+    "Brain": "#4da6ff", "Power": "#ffcc00", "Control": "#b070ff",
+    "Sensor": "#ff88cc", "Actuator": "#00ff88", "Display": "#00d0d0",
+    "Sound": "#ff7733", "Lighting": "#ffe14d", "Mist": "#66ccff",
+    "Chassis": "#8d6e63", "Enclosure": "#a1887f",
+}
+ROLE_COLOR_UNKNOWN = "#888"
+
 TAXONOMY_CONFIG: Dict[str, Any] = {
     "core_roles": ["Brain", "Power", "Control"],
     "aux_roles": ["Sensor", "Actuator", "Display", "Sound", "Lighting", "Mist", "Chassis", "Enclosure"],
@@ -55,8 +67,12 @@ TAXONOMY_CONFIG: Dict[str, Any] = {
     "intent_types": ["have", "prefer", "avoid", "budget_constraint"],
 
     "component_taxonomy": {
-        "Brain": ["Arduino-Uno-class", "ESP32-class", "RaspberryPi-class", "Microbit-class"],
-        "Power": ["USB-5V-class", "Battery-LiPo-class", "Battery-AA-class", "AC-Adapter-class", "USB-Adapter-class"],
+        # RaspberryPi-class 已於 2026-06-13 從使用者可選 Brain 詞彙退役（退役方案 B）：
+        # 小型 STEM demo 目標下不需 Linux SBC（過於複雜、價格/功耗高、消費級可印無益）。
+        # infra 休眠保留（registry ComponentSpec / SSOT / lib/pcb / firmware / MCU_COMPONENTS=5
+        # 皆不動），僅從 taxonomy / alias / phase1 詞彙 / role_alternatives / 訓練詞彙移除。
+        "Brain": ["Arduino-Uno-class", "Arduino-Nano-class", "ESP32-class", "Microbit-class"],
+        "Power": ["USB-5V-class", "Battery-LiPo-class", "Battery-AA-class", "Battery-4AA-class", "AC-Adapter-class", "USB-Adapter-class"],
         "Control": ["Button-class", "Switch-class", "Switch-Generic-class", "Potentiometer-class", "Remote-class", "Joystick-class"],
         "Sensor": ["Sensor-PIR-class", "Sensor-Ultrasonic-class", "Sensor-TempHumid-class", "Sensor-Light-class", "Sensor-SoilMoisture-class", "Sensor-IR-class", "Sensor-MSGEQ7-class"],
         "Actuator": ["Motor-Servo-class", "Motor-DC-class", "Motor-Stepper-class", "Pump-Water-class", "Relay-Module-class", "L298N-Driver-class"],
@@ -65,12 +81,16 @@ TAXONOMY_CONFIG: Dict[str, Any] = {
         "Lighting": ["Lighting-LED-RGB-class", "Lighting-LED-Strip-class", "Lighting-NeoPixel-class", "Lighting-LED-PWM-class"],
         "Mist": ["Mist-Atomizer-class", "Mist-Ultrasonic-class"],
         "Chassis": ["Chassis-Car-class"],
-        "Enclosure": ["Chassis-Car-class"]
+        # Enclosure 不是型錄元件：由程序化外殼生成子系統 (lib/cad/shell/, enclosure_fit.py)
+        # 產生幾何，無對應 *-class 元件。原本誤別名為 Chassis-Car-class 會讓車型底盤
+        # 靜默滿足外殼角色 — 改為空清單，避免錯誤元件選擇 (SSOT-integrity)。
+        "Enclosure": []
     },
 
     "alias_mapping": {
         "Microbit": "Microbit-class", "MicroBit": "Microbit-class", "Micro-Bit": "Microbit-class",
         "MicroBit-class": "Microbit-class", "Arduino": "Arduino-Uno-class",
+        "Nano": "Arduino-Nano-class", "Arduino-Nano": "Arduino-Nano-class",
         "Speaker": "Speaker-class", "Speaker-Unit": "Speaker-class", "Speaker-Unit-class": "Speaker-class",
         "USB-Power-Adapter-class": "USB-Adapter-class", "Battery-AA": "Battery-AA-class",
         "Switch-generic": "Switch-Generic-class", "Sensor-PIR": "Sensor-PIR-class",
@@ -91,12 +111,13 @@ TAXONOMY_CONFIG["all_valid_types"] = set(sum(TAXONOMY_CONFIG["component_taxonomy
 
 EDUCATIONAL_RATIONALE_TEMPLATES = {
     "Arduino-Uno-class": "採用 ATmega328P 微控制器，透過數位/類比 GPIO 腳位控制外部元件。",
+    "Arduino-Nano-class": "Arduino Nano（ATmega328），與 Uno 同核心同腳位但體積僅 1/3，適合機器人等空間受限專題。",
     "ESP32-class": "雙核心 CPU 內建 Wi-Fi/Bluetooth，適合 IoT 無線控制應用。",
     "Microbit-class": "內建加速度計與 LED 矩陣，專為 STEM 教育設計的微控制板。",
-    "RaspberryPi-class": "Linux 單板電腦，適合需要作業系統支援的複雜 AI 應用。",
     "USB-5V-class": "透過 USB 介面提供穩定 5V 直流電源，適合低功耗模組供電。",
     "Battery-LiPo-class": "鋰聚合物電池，能量密度高，適合需要可攜式電源的專題。",
     "Battery-AA-class": "標準 AA 乾電池，取得方便，適合低功耗感測器節點。",
+    "Battery-4AA-class": "4 顆 AA 串聯 6V 電池盒，可攜且電壓落在伺服 4.8-6V 範圍，適合多伺服機器人等需獨立電源軌的負載。",
     "AC-Adapter-class": "將交流電轉換為穩定直流輸出，適合固定式高功耗設備供電。",
     "Button-class": "機械式按鍵，按下時電路導通，是最基礎的數位輸入元件。",
     "Potentiometer-class": "可變電阻器，輸出 0~5V 類比電壓，用於調節音量或速度。",
@@ -136,7 +157,9 @@ ASSEMBLY_V3 = {
     "CLEARANCE": 3.0,
     "TURN_PENALTY": 2.0,
     "WIRE_MARGIN": 1,
-    "VENT_THRESHOLD_MW": 2000,
+    # 對齊 v2 / thermal.py 政策：THERMAL_TIER_MID=1500mW 為「必須主動通風」門檻
+    # （原 2000 與 thermal 建議文字「>1500mW 必須通風」自相矛盾，1500-2000mW 區間會建議卻不加通風）
+    "VENT_THRESHOLD_MW": 1500,
     "H_CONV": 7.0,
     "DT_MAX": 40.0,
 }

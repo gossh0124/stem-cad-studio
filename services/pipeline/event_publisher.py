@@ -198,4 +198,11 @@ def push_phase_data(phase_id: PhaseID, bridge: dict, job: Job, progress_cb: Opti
         # VLM REMOVED — P6 no longer exists
 
     except (TypeError, ValueError):
-        pass
+        # No-Silent-Fallback: a serialization / payload-assembly failure here
+        # means the UI silently loses this phase-data event. Surface it loudly
+        # instead of dropping it: log with traceback, then re-raise.
+        _log.exception(
+            "push_phase_data failed to build/emit SSE phase-data for phase %s",
+            getattr(phase_id, "value", phase_id),
+        )
+        raise

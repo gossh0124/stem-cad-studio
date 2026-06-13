@@ -3,7 +3,7 @@
 來源：
   A. SSOT   = data/component_datasheet_verified.json (electrical.current_typ_ma)
   B. INDEX  = v6/canned/_index.json (total_ma / budget_ma)
-  C. PROBLEM = problem.md 內表格（硬編對照）
+  C. PROBLEM = problem.md 手抄**總耗電**(獨立人工見證;budget 改由 INDEX/BRIDGE 檢,B6)
 
 對每範本：
   1. 讀 v6/canned/<id>.json 取 components 列表
@@ -22,39 +22,50 @@ ROOT = Path(__file__).resolve().parent.parent
 SSOT = ROOT / "data" / "component_datasheet_verified.json"
 CANNED = ROOT / "v6" / "canned"
 
-# problem.md 表（手抄）
-PROBLEM_TABLE: dict[str, tuple[float, int]] = {
-    "auto_waterer":        (355,    800),
-    "plant_monitor":       (76.5,   800),
-    "smart_nightlight":    (71,    1000),
-    "auto_curtain":        (561,   1000),
-    "voice_doorbell":      (200.5, 1000),
-    "rc_car":              (735,   1000),
-    "obstacle_car":        (665,   1000),
-    "talking_robot":       (285,   1000),
-    "music_box":           (200,   1000),
-    "lightsaber":          (750.5, 1000),
-    "electronic_keyboard": (79,    1000),
-    "burglar_alarm":       (145,    800),
-    "access_control":      (342,   1000),
-    "alarm_siren":         (100,   1000),
-    "countdown_timer":     (101,   1000),
-    "voice_guide":         (202,    800),
+# problem.md 表（手抄）—— 僅保留**總耗電**作為獨立人工見證(與 SSOT 對帳)。
+# B6(#31):原 tuple 第二欄(budget)為 stale 額外建制(全 1000,#20/#26/#27 後官方值已變
+# 為 500/800/1500/2000),且 `_all_match` **從不檢 budget**(只比 total)→ 純顯示且誤導。
+# budget 已由 INDEX(idx_budget)+ BRIDGE(power_budget.budget_ma,#26 重烤後讀穿 verified.json)
+# 兩欄權威交叉檢,故移除此手抄 stale 副本(讀穿紀律:不留可讀穿值的手刻副本)。
+PROBLEM_TABLE: dict[str, float] = {
+    "auto_waterer":        355,
+    "plant_monitor":       76.5,
+    "smart_nightlight":    71,
+    "auto_curtain":        561,
+    "voice_doorbell":      200.5,
+    "rc_car":              735,
+    "biped_robot":         664,
+    "talking_robot":       285,
+    "music_box":           200,
+    "lightsaber":          750.5,
+    "electronic_keyboard": 79,
+    "burglar_alarm":       145,
+    "access_control":      342,
+    "alarm_siren":         100,
+    "countdown_timer":     101,
+    "voice_guide":         202,
 }
 
 
-def _load_ssot() -> dict[str, float]:
-    """class_name → current_typ_ma (mA)"""
+def _load_ssot() -> dict[str, float | None]:
+    """class_name → current_typ_ma (mA).
+
+    驗證 gate 不可為缺值杜撰數字：若某 class 缺 current_typ_ma,
+    記為 None,讓 main() 走 unresolved/[WARN] 路徑並使 gate FAIL,
+    而不是靜默回退 idle/0(會讓 ssot_total 低估且仍可能誤判 OK)。
+    """
     data = json.loads(SSOT.read_text(encoding="utf-8"))
-    out: dict[str, float] = {}
+    out: dict[str, float | None] = {}
     for cls, body in data.items():
         if cls == "_meta":
             continue
         elec = body.get("electrical") or {}
         cur = elec.get("current_typ_ma")
         if cur is None:
-            cur = elec.get("current_idle_ma", 0)
-        out[cls] = float(cur)
+            # 缺典型電流:不杜撰回退值,標記為未解析
+            out[cls] = None
+        else:
+            out[cls] = float(cur)
     return out
 
 
@@ -102,14 +113,19 @@ def _bridge_power_budget(bridge: dict) -> dict:
 
 def _all_match(ssot_t: float, spec_t: float, idx_t: float,
                pb_t: float | None, pm_t: float | None) -> bool:
-    """Five-column concordance: SSOT, SPEC, INDEX, BRIDGE, PROBLEM all within 1 mA."""
+    """Five-column concordance: SSOT, SPEC, INDEX, BRIDGE, PROBLEM all within 1 mA.
+
+    缺 BRIDGE(power_budget)或 PROBLEM 對照值視為「資料不完整」→ 硬 FAIL,
+    與顯示用的 all_ok 判定(d_pb/d_pm 在 None 時為 False)保持一致,
+    避免畫面顯示 MISMATCH! 但 gate 卻回 0(always-green)的歧異。
+    """
     if abs(spec_t - idx_t) >= 1:
         return False
     if abs(ssot_t - idx_t) >= 1:
         return False
-    if pb_t is not None and abs(ssot_t - pb_t) >= 1:
+    if pb_t is None or abs(ssot_t - pb_t) >= 1:
         return False
-    if pm_t is not None and abs(ssot_t - pm_t) >= 1:
+    if pm_t is None or abs(ssot_t - pm_t) >= 1:
         return False
     return True
 
@@ -133,6 +149,11 @@ def main() -> int:
         for c in comps:
             cls = _class_of(c)
             q = _qty(c)
+            if c.get("role") == "Power":
+                # 電源 source 的 spec.current_ma = **輸出容量**(非消耗);SSOT 亦無 current_typ_ma。
+                # 兩側一致排除,否則 AC/USB-Adapter 容量(2000/1000)灌入「總耗電」→ 假 MISMATCH
+                # (B6/#20 電源容量 vs 消耗混淆)。Battery spec.current_ma 已為 0,不受影響。
+                continue
             cur_ssot = ssot.get(cls)
             cur_spec = _spec_current(c)
             spec_total += cur_spec * q
@@ -146,18 +167,17 @@ def main() -> int:
         pb = _bridge_power_budget(bridge)
         pb_total = pb.get("total_ma")
         pb_budget = pb.get("budget_ma")
-        pm = PROBLEM_TABLE.get(tpl_id)
-        pm_total = pm[0] if pm else None
-        pm_budget = pm[1] if pm else None
+        pm_total = PROBLEM_TABLE.get(tpl_id)  # 獨立人工見證(總耗電)
+        pm_budget = None                       # budget 改由 INDEX/BRIDGE 兩欄檢(B6)
         rows.append((tpl_id, ssot_total, spec_total, idx_total, pb_total, pm_total,
                      idx_budget, pb_budget, pm_budget, unresolved))
 
     print(f"{'tpl_id':<22} {'SSOT':>7} {'SPEC':>7} {'INDEX':>7} {'BRIDGE':>7} {'PM':>7}  "
-          f"{'budget(I/B/P)':<14} status")
+          f"{'budget(I/B)':<12} status")
     print("-" * 110)
     for (tpl_id, ssot_t, spec_t, idx_t, pb_t, pm_t,
-         idx_b, pb_b, pm_b, unres) in rows:
-        budget = f"{idx_b}/{pb_b if pb_b else '-'}/{pm_b if pm_b else '-'}"
+         idx_b, pb_b, _pm_b, unres) in rows:
+        budget = f"{idx_b}/{pb_b if pb_b else '-'}"
         unr = ",".join(unres) if unres else ""
         pm_disp = f"{pm_t:.1f}" if pm_t is not None else "-"
         pb_disp = f"{pb_t:.1f}" if pb_t is not None else "-"

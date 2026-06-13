@@ -51,25 +51,27 @@
       return els;
     },
 
-    Pump(x, y, w, h, c, e, _H) {
-      const els = [], cx = x+w/2, cy = y+h/2;
-      const r = Math.min(w, h) * 0.32;
-      els.push(e('circle', { cx, cy, r, fill: '#06142a', stroke: c, strokeWidth: 1.5, opacity: 0.75 }));
-      els.push(e('circle', { cx, cy, r: r*0.65, fill: 'none', stroke: c, strokeWidth: 0.8, opacity: 0.4 }));
-      els.push(e('circle', { cx, cy, r: 2.5, fill: '#444', stroke: c, strokeWidth: 0.6, opacity: 0.6 }));
-      for (let a = 0; a < 360; a += 45) {
+    Pump(x, y, w, h, c, e, H) {
+      // RC3(2026-06-13):原置中圓形葉輪 glyph 與真 port(SOUTH nx0.3/0.41)脫鉤 → 改 DC 馬達式
+      // 表示(submersible DC pump = DC 馬達 + 葉輪/泵頭),比照 DCMotor Q1 修法:端子不硬畫,
+      // 由 SOUTH SCHEM_PINS port marker 畫(對齊真孔位);馬達本體靠左,真腳落其正下方。
+      const els = [], cy = y+h/2;
+      const bx = x+3, by = y+5, bw = w-6, bh = h-10;
+      H.pcb(els, e, bx, by, bw, bh, 2, c);
+      // DC 馬達本體(左半):繞組 + M
+      const mw = bw*0.5, mh = bh*0.7, mxx = bx+3, myy = cy-mh/2;
+      els.push(e('rect', { x: mxx, y: myy, width: mw, height: mh, rx: 3, fill: '#1a1a1a', stroke: '#888', strokeWidth: 0.8, opacity: 0.7 }));
+      for (let i = 0; i < 5; i++) els.push(e('line', { x1: mxx+2, y1: myy+3+i*(mh-6)/4, x2: mxx+mw-2, y2: myy+3+i*(mh-6)/4, stroke: '#666', strokeWidth: 0.4, opacity: 0.5 }));
+      els.push(e('text', { x: mxx+mw/2, y: cy+3, textAnchor: 'middle', fill: c, fontSize: 8, fontWeight: 700, opacity: 0.5, fontFamily: 'var(--font-mono)' }, 'M'));
+      // 葉輪/泵頭(右):圓 + 出水口
+      const pr = Math.min(bw*0.18, bh*0.4);
+      const pcx = bx+bw*0.74, pcy = cy;
+      els.push(e('circle', { cx: pcx, cy: pcy, r: pr, fill: '#06142a', stroke: c, strokeWidth: 1, opacity: 0.8 }));
+      for (let a = 0; a < 360; a += 60) {
         const rad = a * Math.PI / 180;
-        els.push(e('line', {
-          x1: cx + Math.cos(rad)*3.5, y1: cy + Math.sin(rad)*3.5,
-          x2: cx + Math.cos(rad)*r*0.6, y2: cy + Math.sin(rad)*r*0.6,
-          stroke: c, strokeWidth: 1, opacity: 0.35 }));
+        els.push(e('line', { x1: pcx, y1: pcy, x2: pcx + Math.cos(rad)*pr*0.7, y2: pcy + Math.sin(rad)*pr*0.7, stroke: c, strokeWidth: 0.7, opacity: 0.4 }));
       }
-      els.push(e('rect', { x: cx+r-2, y: cy-3, width: 10, height: 6, rx: 1.5,
-        fill: '#0a1a2a', stroke: c, strokeWidth: 0.8, opacity: 0.6 }));
-      els.push(e('rect', { x: cx-3, y: cy+r-2, width: 6, height: 8, rx: 1.5,
-        fill: '#0a1a2a', stroke: c, strokeWidth: 0.8, opacity: 0.6 }));
-      els.push(e('line', { x1: x+6, y1: cy-3, x2: cx-r, y2: cy-3, stroke: '#ff4444', strokeWidth: 1.2, opacity: 0.5 }));
-      els.push(e('line', { x1: x+6, y1: cy+3, x2: cx-r, y2: cy+3, stroke: '#555', strokeWidth: 1.2, opacity: 0.5 }));
+      els.push(e('rect', { x: x+w-7, y: cy-3, width: 7, height: 6, rx: 1.5, fill: '#0a1a2a', stroke: c, strokeWidth: 0.7, opacity: 0.55 }));  // 出水口
       return els;
     },
 
@@ -199,7 +201,7 @@
 
     Buzzer(x, y, w, h, c, e, _H) {
       const els = [], cx = x+w/2, cy = y+h/2;
-      const r = Math.min(w, h) * 0.32;
+      const r = Math.min(w, h) * 0.46;  // W1.5:圓形蜂鳴器填滿 footprint(原 0.32 縮在中央→接點懸空)
       els.push(e('circle', { cx, cy, r, fill: '#0a0a0a', stroke: c, strokeWidth: 1.2, opacity: 0.75 }));
       els.push(e('circle', { cx, cy, r: r*0.65, fill: 'none', stroke: c, strokeWidth: 0.5, opacity: 0.4 }));
       els.push(e('circle', { cx, cy, r: r*0.35, fill: 'none', stroke: c, strokeWidth: 0.5, opacity: 0.3 }));
@@ -244,11 +246,7 @@
       for (let i = 0; i < 5; i++)
         els.push(e('line', { x1: hx+2, y1: hy+3+i*(hh-6)/4, x2: hx+hw-2, y2: hy+3+i*(hh-6)/4,
           stroke: '#666', strokeWidth: 0.4, opacity: 0.5 }));
-      for (let i = 0; i < 2; i++) {
-        const tx = bx+bw-12, ty = by+6+i*(bh-12);
-        els.push(e('rect', { x: tx, y: ty-3, width: 8, height: 6, rx: 1,
-          fill: '#1a3a2a', stroke: c, strokeWidth: 0.5, opacity: 0.65 }));
-      }
+      // Q1(2026-06-08):移除硬編端子裝飾(M+/M- 真腳由 SOUTH port marker 畫,見 SCHEM_PINS)。
       const mr = Math.min(w*0.18, h*0.3);
       const mcx = x+w-mr-8, mcy = cy;
       els.push(e('circle', { cx: mcx, cy: mcy, r: mr, fill: '#1a1a2a', stroke: c, strokeWidth: 1, opacity: 0.75 }));
@@ -391,16 +389,16 @@
     },
 
     BatteryAA(x, y, w, h, c, e, H) {
-      const els = [], cx = x+w/2, cy = y+h/2;
-      const bw = w*0.75, bh = h*0.7;
-      const bx2 = cx - bw/2, by2 = cy - bh/2;
-      els.push(e('rect', { x: bx2, y: by2, width: bw, height: bh, rx: 3,
-        fill: '#0a0a08', stroke: c, strokeWidth: 1.2, opacity: 0.75 }));
-      H.hole(els, e, bx2+bw*0.05, by2+bh*0.09, 1.5);
-      H.hole(els, e, bx2+bw*0.95, by2+bh*0.91, 1.5);
-      const cellW = (bw-6)/2, cellH = bh-4;
+      // W1.5(2026-06-08):2×AA 座填滿 footprint bbox(=真 1:1 投影);真 port marker 畫腳。
+      const els = [];
+      const bx2 = x+3, by2 = y+4, bw = w-6, bh = h-8;
+      els.push(e('rect', { x: bx2, y: by2, width: bw, height: bh, rx: 4,
+        fill: '#0a0a08', stroke: c, strokeWidth: 1.3, opacity: 0.85 }));
+      H.hole(els, e, bx2+bw*0.05, by2+bh*0.12, 1.4);
+      H.hole(els, e, bx2+bw*0.95, by2+bh*0.88, 1.4);
+      const cellW = (bw-12)/2, cellH = bh-10;
       for (let i = 0; i < 2; i++) {
-        const cx2 = bx2+3+i*(cellW+1), cy2 = by2+2;
+        const cx2 = bx2+4+i*(cellW+4), cy2 = by2+5;
         els.push(e('rect', { x: cx2, y: cy2, width: cellW, height: cellH, rx: 2,
           fill: '#1a1a14', stroke: '#888', strokeWidth: 0.6, opacity: 0.6 }));
         els.push(e('rect', { x: cx2+cellW/2-2, y: cy2-1, width: 4, height: 3, rx: 1,
@@ -412,8 +410,7 @@
         els.push(e('text', { x: cx2+cellW/2, y: cy2+cellH-2, textAnchor: 'middle',
           fill: '#aaa', fontSize: 7, opacity: 0.5, fontWeight: 700 }, '−'));
       }
-      els.push(e('line', { x1: bx2+bw, y1: cy-3, x2: bx2+bw+6, y2: cy-3, stroke: '#ff4444', strokeWidth: 1.2, opacity: 0.5 }));
-      els.push(e('line', { x1: bx2+bw, y1: cy+3, x2: bx2+bw+6, y2: cy+3, stroke: '#555', strokeWidth: 1.2, opacity: 0.5 }));
+      // Q1(2026-06-08):移除硬編 +/− 飛線裝飾(與真 SOUTH port 脫鉤);腳由真 port marker 畫。
       return els;
     },
 
@@ -506,12 +503,10 @@
       hole(els, el, hx, hy, r) {
         els.push(el('circle', { cx: hx, cy: hy, r: r||2, fill: '#0a0a0a', stroke: '#777', strokeWidth: 0.6, opacity: 0.6 }));
       },
-      pinRow(els, el, px, py, count, spacing) {
-        for (let i = 0; i < count; i++) {
-          const pinY = py + i * spacing;
-          els.push(el('rect', { x: px-1.5, y: pinY-1.5, width: 3, height: 3, rx: 0.3,
-            fill: '#d4a84e', opacity: 0.6 }));
-        }
+      pinRow(_els, _el, _px, _py, _count, _spacing) {
+        // Q1(2026-06-08):元件腳統一由 SVG 真 port marker 畫(SCHEM_PINS 單一真相)。
+        // glyph 不再自繪 pin header 裝飾腳(原硬編座標與真 port 脫鉤 → 線接不到畫出的腳)。
+        // 保留簽名相容所有呼叫端;no-op。
       },
       ic(els, el, ix, iy, iw, ih, pins, label) {
         els.push(el('rect', { x: ix, y: iy, width: iw, height: ih, rx: 1.5,
@@ -528,10 +523,69 @@
       },
     };
 
+    // W-Render-Real(2026-06-08):資料驅動「真實原件投影」為主 —— 從 SSOT 子元件幾何
+    // (COMPONENT_DIMENSIONS[<class>].ports:cx/cy/shape/bodyW,1:1)畫真實外觀。compKey→class
+    // 橋接由 window.COMPKEY_TO_CLASS(schematic-pins.js 輸出,鏡像後端 SHORT_TO_CLASS)。
+    // 手刻 stylized glyph(COMP_RENDERERS)退為「該 class 無子元件投影資料」時的 fallback。
+    const cls = (window.COMPKEY_TO_CLASS && window.COMPKEY_TO_CLASS[compKey]) || compKey;
+    const real = _genericPortDecor(cls, x, y, w, h, e, true);  // flipY:非 MCU footprint 翻正對 datasheet/3D(P0.5 #8)
+    if (real && real.length) return real;
+    // fallback:無 class 子元件資料 → 暫用手刻 glyph(逐步退役,見「手刻普查 + 預防閘」TODO)
+    // 手刻 glyph(COMP_RENDERERS)以 SVG y-down 自繪、非資料驅動 → 不套 flipY(本就正立)。
     const renderer = COMP_RENDERERS[compKey];
-    if (!renderer) return [];
-    return renderer(x, y, w, h, c, e, H);
+    if (renderer) return renderer(x, y, w, h, c, e, H);
+    return _genericPortDecor(compKey, x, y, w, h, e, true);  // flipY:資料驅動路徑同樣翻正
   }
 
+  // 從 component-dimensions.js 的 ports(cx/cy mm + shape + params.bodyW/bodyD)畫 2D 子元件。
+  // no-fallback:未知 shape → 醒目洋紅虛線標記(不靜默畫成普通方塊);無資料 → 回 []。
+  function _genericPortDecor(compKey, x, y, w, h, e, flipY) {
+    const dims = window.COMPONENT_DIMENSIONS && window.COMPONENT_DIMENSIONS[compKey];
+    if (!dims || !Array.isArray(dims.ports) || !dims.l || !dims.w) return [];
+    const Lmm = dims.l, Wmm = dims.w, els = [];
+    const sx = (cx) => x + (cx / Lmm) * w;
+    // flipY:SSOT cx/cy 原點為 PCB 左下角(y-up,見 verified.json _meta.coordinate_origin);
+    // SVG 為 y-down。flipY=true 把 cy 翻成 top-view,與 3D scene-3d 的 z=-(cy-W/2) 及 datasheet
+    // silkscreen 同向。非 MCU footprint(_compDecor)傳 true 修正鏡像;MCU(_realProjection)用
+    // 預設 false,其翻正由外層 matrix(0,-1,-1,0,…)處理,於此再翻會 double-flip(P0.5 #8)。
+    const sy = (cy) => flipY ? (y + h - (cy / Wmm) * h) : (y + (cy / Wmm) * h);
+    const szx = (mm) => Math.max(mm * w / Lmm, 1.2);
+    const szy = (mm) => Math.max(mm * h / Wmm, 1.2);
+    for (const p of dims.ports) {
+      if (p.cx == null || p.cy == null) continue;
+      const px = sx(p.cx), py = sy(p.cy);
+      const pr = (p.params && p.params.bodyW) || 2, pd = (p.params && p.params.bodyD) || 2;
+      const bw = szx(pr), bh = szy(pd), col = p.color || '#888', shp = String(p.shape || '');  // nofallback-ok: port 裝飾 UI 色(b 類),灰色=未指定;幾何 bw/bh 由 szx/szy 真值算
+      if (shp.indexOf('led') === 0) {
+        els.push(e('circle', { cx: px, cy: py, r: Math.max(Math.min(bw, bh) / 2, 1.2),
+          fill: col, opacity: 0.75, stroke: '#000', strokeWidth: 0.3 }));
+      } else if (shp.indexOf('ic') === 0) {
+        els.push(e('rect', { x: px - bw / 2, y: py - bh / 2, width: bw, height: bh, rx: 0.5,
+          fill: '#0a0a14', stroke: '#888', strokeWidth: 0.5 }));
+        els.push(e('circle', { cx: px - bw / 2 + 1.2, cy: py - bh / 2 + 1.2, r: 0.7, fill: '#aaa', opacity: 0.6 }));
+      } else if (shp.indexOf('mount') === 0 || shp.indexOf('hole') >= 0) {
+        // mounting hole → 鍍通孔環(非實心方塊,符合真實外觀)
+        const _hr = Math.max(Math.min(bw, bh) / 2, 1);
+        els.push(e('circle', { cx: px, cy: py, r: _hr, fill: '#0a0a0a', stroke: '#777', strokeWidth: 0.5, opacity: 0.5 }));
+      } else if (/^(conn|display|pcb|sensor|relay|motor|battery|cap|res|crystal|button|buzzer|pot|heatsink|toggle|vreg|cylinder|box|dome|pump|slide)/.test(shp)) {
+        els.push(e('rect', { x: px - bw / 2, y: py - bh / 2, width: bw, height: bh, rx: 0.5,
+          fill: col, opacity: 0.5, stroke: '#000', strokeWidth: 0.3 }));
+      } else {
+        // no-fallback:渲染器/2D-map 未知的 shape → 醒目標記,絕不靜默頂替
+        els.push(e('rect', { x: px - bw / 2, y: py - bh / 2, width: Math.max(bw, 2), height: Math.max(bh, 2),
+          fill: 'none', stroke: '#ff00ff', strokeWidth: 0.8, strokeDasharray: '2 1' }));
+        els.push(e('text', { x: px, y: py - bh / 2 - 1, textAnchor: 'middle',
+          fill: '#ff00ff', fontSize: 3, fontFamily: 'var(--font-mono)' }, '?' + shp));
+      }
+    }
+    return els;
+  }
+
+  // W-Render-Real:供 MCU(schematic-elk._mcuDecor)等以 class 直接取資料驅動真投影子元件。
+  function _realProjection(classKey, x, y, w, h) {
+    const e = (tag, props, ...ch) => React.createElement(tag, props, ...ch);
+    return _genericPortDecor(classKey, x, y, w, h, e);
+  }
+  window._realProjection = _realProjection;
   window._compDecor = _compDecor;
 })();

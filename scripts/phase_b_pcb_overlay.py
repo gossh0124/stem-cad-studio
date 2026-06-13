@@ -183,7 +183,7 @@ def consistency_check():
     print('[3/3] Consistency check: registry vs PCBSpec')
     if len(spec.ports) != len(derived):
         print(f'  [FAIL] Port count mismatch: registry={len(spec.ports)} vs derived={len(derived)}')
-        return
+        return False
 
     all_match = True
     for reg_port, der in zip(spec.ports, derived):
@@ -197,9 +197,11 @@ def consistency_check():
             all_match = False
     if all_match:
         print(f'  [OK] All {len(spec.ports)} ports match exactly between registry and PCBSpec')
+    return all_match
 
 
 if __name__ == '__main__':
     draw_pcb_layout()
     extract_datasheet_mechanical_drawing()
-    consistency_check()
+    ok = consistency_check()
+    sys.exit(0 if ok else 1)

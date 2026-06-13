@@ -56,6 +56,9 @@ def _iter_plan_files(paths: Iterable[Path]) -> Iterator[tuple[str, dict]]:
             obj = json.loads(p.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
+        # 容錯：非 dict 頂層(例如 top-level array)直接略過,不可中斷整批驗證
+        if not isinstance(obj, dict):
+            continue
         # 容錯：plan 物件本身 / 包了 bridge.plan / phase4.plan
         plan = obj if isinstance(obj.get("elements"), list) else (
             obj.get("plan") or obj.get("phase4", {}).get("plan") or {}

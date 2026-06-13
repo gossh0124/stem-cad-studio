@@ -69,24 +69,24 @@ def generate_candidates(
 
 def score_candidate(
     candidate: dict,
-    solver_result: dict,
     components: List[dict],
     registry: Optional[dict] = None,
 ) -> Tuple[float, Dict[str, float]]:
     """Score a candidate assembly plan using rule-based geometric checks.
 
-    Returns (total_score, breakdown_dict) where total is 0-100.
+    Returns (total_score, breakdown_dict) where total is 0-100. Solver-agnostic:
+    scores the LoRA-B compiled plan + components + registry. (The former
+    solver_result arg was vestigial — no scoring sub-fn read its placements — so it
+    was removed during the V2 retirement; scoring is unchanged.)
     """
     compiled = candidate.get("compiled") or {}
     plan = candidate.get("plan") or {}
-    params = candidate.get("params") or {}
-    placements = solver_result.get("placements", [])
 
-    spatial   = _score_spatial(compiled, placements, components)
+    spatial   = _score_spatial(compiled, components)
     cutout    = _score_cutout_alignment(compiled, components, registry)
     printing  = _score_printability(compiled, plan)
     thermal   = _score_thermal(compiled, components)
-    clearance = _score_clearance(compiled, placements)
+    clearance = _score_clearance(compiled)
 
     total = (
         spatial   * (_W_SPATIAL   / 25.0) +
@@ -107,7 +107,6 @@ def score_candidate(
 
 def pre_filter(
     candidates: List[dict],
-    solver_result: dict,
     components: List[dict],
     registry: Optional[dict] = None,
     top_k: int = 1,
@@ -115,7 +114,7 @@ def pre_filter(
     """Score all candidates and return top-k as (candidate, score, breakdown)."""
     scored = []
     for c in candidates:
-        total, bd = score_candidate(c, solver_result, components, registry)
+        total, bd = score_candidate(c, components, registry)
         scored.append((c, total, bd))
 
     scored.sort(key=lambda x: x[1], reverse=True)
@@ -125,8 +124,8 @@ def pre_filter(
 # ── Scoring sub-functions (each returns 0-25 range) ──────────────────
 
 
-def _score_spatial(compiled: dict, placements: list, components: list) -> float:
-    """Check if layout zones are unique and placements fit enclosure."""
+def _score_spatial(compiled: dict, components: list) -> float:
+    """Check if layout zones are unique and coverage is adequate."""
     score = 25.0
     layout = compiled.get("layout", [])
 
@@ -160,8 +159,12 @@ def _score_cutout_alignment(
         try:
             from lib.registry import COMPONENT_REGISTRY
             registry = COMPONENT_REGISTRY
-        except ImportError:
-            return score
+        except ImportError as exc:
+            # registry is core infrastructure; an unscorable check must not
+            # pass as a perfect score (always-green gate). Fail loud instead.
+            raise RuntimeError(
+                "_score_cutout_alignment cannot run: lib.registry import failed"
+            ) from exc
 
     n_checked = 0
     n_aligned = 0
@@ -217,8 +220,12 @@ def _score_thermal(compiled: dict, components: list) -> float:
 
     try:
         from lib.specs import THERMAL_MW
-    except ImportError:
-        return score
+    except ImportError as exc:
+        # A missing thermal model must not inflate scores to full marks
+        # (always-green gate). Fail loud instead of silently disabling the check.
+        raise RuntimeError(
+            "_score_thermal cannot run: lib.specs.THERMAL_MW import failed"
+        ) from exc
 
     hot_types = {c.get("type", "") for c in components
                  if THERMAL_MW.get(c.get("type", ""), 0) >= 500}
@@ -237,7 +244,7 @@ def _score_thermal(compiled: dict, components: list) -> float:
     return max(0.0, score)
 
 
-def _score_clearance(compiled: dict, placements: list) -> float:
+def _score_clearance(compiled: dict) -> float:
     """Check if layout has reasonable spacing (no packing anomalies)."""
     score = 15.0
     layout = compiled.get("layout", [])

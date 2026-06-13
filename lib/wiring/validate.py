@@ -28,6 +28,7 @@ from .engine import (  # noqa: F401 — re-use engine mappings
     normalize_brain,
     normalize_comps,
 )
+from lib.pin_maps import label_mcu_pin, mcu_pin_prefix
 
 REPO = Path(__file__).resolve().parent.parent.parent
 SSOT_PATH = REPO / "data" / "component_datasheet_verified.json"
@@ -45,35 +46,10 @@ def _load_ssot() -> dict:
         return _ssot_cache
 
 
-# Mapping: wiring.py 用的 short name → SSOT class name
-_SHORT_TO_CLASS: dict[str, str] = {
-    "Arduino": "Arduino-Uno-class",
-    "ESP32": "ESP32-class",
-    "RPi": "RaspberryPi-class",
-    "Microbit": "Microbit-class",
-    "NeoPixel": "Lighting-NeoPixel-class",
-    "LED_Single": "Lighting-LED-PWM-class",
-    "LED_RGB": "Lighting-LED-RGB-class",
-    "Speaker": "MP3-Module-class",
-    "Buzzer_Active": "Buzzer-Active-class",
-    "Buzzer_Passive": "Buzzer-Passive-class",
-    "OLED": "Display-OLED-class",
-    "LCD": "Display-LCD-class",
-    "Servo": "Motor-Servo-class",
-    "DCMotor": "L298N-Driver-class",
-    "Stepper": "Motor-Stepper-class",
-    "Relay": "Relay-Module-class",
-    "Pump": "Pump-Water-class",
-    "TempHumid": "Sensor-TempHumid-class",
-    "Ultrasonic": "Sensor-Ultrasonic-class",
-    "PIR": "Sensor-PIR-class",
-    "IR": "Sensor-IR-class",
-    "SoilMoisture": "Sensor-SoilMoisture-class",
-    "Light": "Sensor-Light-class",
-    "MSGEQ7": "Sensor-MSGEQ7-class",
-    "Button": "Button-class",
-    "Switch": "Switch-class",
-}
+# Mapping: wiring short name → SSOT class name。
+# 單一真值在 comp_class_map(leaf module，import 無循環風險）；此 import 取代原本同份字面量副本，
+# 杜絕「三處複製、各自漂移」（見 power_inject / comp_class_map 與 tests/test_short_to_class_single_source.py）。
+from .comp_class_map import SHORT_TO_CLASS as _SHORT_TO_CLASS, instance_base  # noqa: E402
 
 # Mapping: wiring.py 用的 tag → SSOT pin name（差異 alias）
 _TAG_TO_SSOT_PIN: dict[tuple[str, str], str] = {
@@ -133,9 +109,9 @@ def _mcu_pin_info(brain_key: str, label: str) -> dict | None:
             info = ssot_pin_info(cls, f"{prefix}{label}")
             if info:
                 return info
-    # RPi: GPIO17 (但 wiring.py allocate 出 17 → label="D17", strip → "17")
+    # RPi: GPIO17 (label_mcu_pin 產出 "GP17", strip "GP" → "17")
     if brain_key == "RPi":
-        stripped = label.lstrip("D")
+        stripped = label.lstrip("GP")
         info = ssot_pin_info(cls, f"GPIO{stripped}")
         if info:
             return info
@@ -278,30 +254,91 @@ def validate_wiring(brain: str, comps: list[str]) -> list[WiringIssue]:
     alloc = allocate_pins(brain_key, comps_norm)
 
     issues: list[WiringIssue] = []
-    pin_prefix = "P" if brain_key == "Microbit" else "D"
 
     for comp_short in comps_norm:
-        ssot_class = _SHORT_TO_CLASS.get(comp_short)
+        comp_base = instance_base(comp_short)  # 多實例(Servo~2)→ class-level 查 base
+        ssot_class = _SHORT_TO_CLASS.get(comp_base)
         if not ssot_class:
-            _log.warning("SSOT class 未註冊: %s — 跳過 direction 驗證", comp_short)
+            # Fail loud: an unmapped component must surface as an issue, not
+            # silently pass the only direction/voltage check (false all-clear).
+            _log.warning("SSOT class 未註冊: %s — 無法驗證", comp_short)
+            issues.append(WiringIssue(
+                severity="error",
+                comp=comp_short,
+                comp_pin="*",
+                comp_direction="unknown",
+                mcu_pin="*",
+                mcu_direction="unknown",
+                reason=f"SSOT class 未註冊: {comp_short}，無法執行 direction/voltage 驗證",
+            ))
             continue
         comp_pins_map = alloc["allocation"].get(comp_short, {})
 
         for tag, mcu_pin in comp_pins_map.items():
-            ssot_pin_name = _to_ssot_pin_name(comp_short, tag)
+            ssot_pin_name = _to_ssot_pin_name(comp_base, tag)
             comp_pin_info = ssot_pin_info(ssot_class, ssot_pin_name)
             if not comp_pin_info:
-                _log.warning("SSOT pin 未找到: %s.%s (class=%s) — 跳過此 pin 驗證",
+                # Fail loud: a pin we cannot resolve in SSOT must surface as a
+                # warning, not be silently exempted from validation.
+                _log.warning("SSOT pin 未找到: %s.%s (class=%s) — 無法驗證",
                              comp_short, ssot_pin_name, ssot_class)
+                issues.append(WiringIssue(
+                    severity="warning",
+                    comp=comp_short,
+                    comp_pin=tag,
+                    comp_direction="unknown",
+                    mcu_pin=label_mcu_pin(brain_key, mcu_pin),
+                    mcu_direction="unknown",
+                    reason=f"SSOT pin 未找到: {ssot_pin_name}（class={ssot_class}），無法驗證此 pin",
+                ))
                 continue
             comp_dir = comp_pin_info.get("direction", "other")
             comp_vd  = comp_pin_info.get("voltage_domain", "")
 
-            # MCU pin 查詢:wiring.py allocate 出的 raw value 是 int (3, 5, 17) 或 str ("A0")
-            mcu_label = f"{pin_prefix if isinstance(mcu_pin, int) else ''}{mcu_pin}"
+            # MCU pin 查詢:使用 label_mcu_pin 統一前綴規則（SSOT for pin labeling）
+            mcu_label = label_mcu_pin(brain_key, mcu_pin)
             mcu_info = _mcu_pin_info(brain_key, mcu_label)
-            mcu_dir = (mcu_info or {}).get("direction", "digital_bidir")
-            mcu_vd  = (mcu_info or {}).get("voltage_domain", "") or _BRAIN_DEFAULT_VD.get(brain_key, "")
+            if mcu_info is None:
+                # Fail loud: an unresolved MCU pin must NOT default to the
+                # permissive 'digital_bidir' (compatible with everything),
+                # which would turn a lookup miss into an automatic PASS and
+                # mask genuine direction conflicts. Surface it as a warning.
+                _log.warning("MCU pin 未解析: %s.%s → %s (brain=%s) — 無法驗證 direction",
+                             comp_short, tag, mcu_label, brain_key)
+                issues.append(WiringIssue(
+                    severity="warning",
+                    comp=comp_short,
+                    comp_pin=tag,
+                    comp_direction=comp_dir,
+                    mcu_pin=mcu_label,
+                    mcu_direction="unknown",
+                    reason=f"MCU pin {mcu_label} 無法在 SSOT 解析，無法驗證 direction 相容性",
+                    comp_vd=comp_vd,
+                ))
+                # NOTE: direction can't be verified, but the voltage domain
+                # still can — comp_vd is known and the MCU side falls back to
+                # the brain default rail. Keep the No-Silent-Fallback guard
+                # above while still running the VD cross-check, so a genuine
+                # 3.3V↔5V mismatch is not lost just because the MCU pin label
+                # wasn't found in the SSOT (ADR-1 regression fix).
+                mcu_vd_fallback = _BRAIN_DEFAULT_VD.get(brain_key, "")
+                if comp_dir not in ("power", "gnd"):
+                    vd_ok, vd_sev, vd_reason = _check_voltage_domain(comp_vd, mcu_vd_fallback)
+                    if not vd_ok:
+                        issues.append(WiringIssue(
+                            severity=vd_sev,
+                            comp=comp_short,
+                            comp_pin=tag,
+                            comp_direction=comp_dir,
+                            mcu_pin=mcu_label,
+                            mcu_direction="unknown",
+                            reason=vd_reason,
+                            comp_vd=comp_vd,
+                            mcu_vd=mcu_vd_fallback,
+                        ))
+                continue
+            mcu_dir = mcu_info.get("direction", "digital_bidir")
+            mcu_vd  = mcu_info.get("voltage_domain", "") or _BRAIN_DEFAULT_VD.get(brain_key, "")
 
             # Direction compatibility check
             ok, severity, reason = _is_compatible(comp_dir, mcu_dir)
@@ -335,6 +372,10 @@ def validate_wiring(brain: str, comps: list[str]) -> list[WiringIssue]:
                         mcu_vd=mcu_vd,
                     ))
 
+    # S-power-feas-validate: 電源可行性環
+    from .power_feasibility import check_power_feasibility
+    issues.extend(check_power_feasibility(brain_key, comps_norm))
+
     return issues
 
 
@@ -362,18 +403,18 @@ def resolve_wiring_pin_level(brain: str, comps: list[str]) -> dict:
     base = resolve_wiring(brain_key, comps_norm)
 
     result: dict[str, dict] = {}
-    pin_prefix = "P" if brain_key == "Microbit" else "D"
     mcu_class = _SHORT_TO_CLASS.get(brain_key)
 
     for comp_short, info in base.items():
-        ssot_class = _SHORT_TO_CLASS.get(comp_short)
+        comp_base = instance_base(comp_short)  # 多實例 → class-level 查 base
+        ssot_class = _SHORT_TO_CLASS.get(comp_base)
         connections: list[dict] = []
 
         for p in info.get("pins", []):
             tag = p["comp"]
             mcu_label = p["mcu"]
             # 元件端
-            ssot_pin = _to_ssot_pin_name(comp_short, tag)
+            ssot_pin = _to_ssot_pin_name(comp_base, tag)
             comp_info = ssot_pin_info(ssot_class, ssot_pin) if ssot_class else None
             # VCC / GND 不在元件 SSOT pin 列表時退而給通用方向
             if tag == "VCC":
@@ -388,7 +429,7 @@ def resolve_wiring_pin_level(brain: str, comps: list[str]) -> dict:
             mcu_info = ssot_pin_info(mcu_class, mcu_label) if mcu_class else None
             if mcu_label in ("GND", "GND_D", "GND2"):
                 mcu_dir, mcu_vd = "gnd", "n/a"
-            elif mcu_label in ("5V", "3V3", "VIN"):
+            elif mcu_label in ("5V", "3V3", "3V", "VIN"):
                 mcu_dir, mcu_vd = "power", mcu_label
             else:
                 mcu_dir = (mcu_info or {}).get("direction", "digital_bidir")
@@ -416,6 +457,8 @@ def resolve_wiring_pin_level(brain: str, comps: list[str]) -> dict:
 def _power_vd_from_label(label: str) -> str:
     if "3V3" in label or "3.3V" in label:
         return "3V3"
+    if label == "3V":
+        return "3V3"  # Microbit 3V rail is 3.3V domain
     if "VIN" in label:
         return "vin"
     return "5V"

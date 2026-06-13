@@ -43,32 +43,11 @@
     signal:       { color: null,      width: 1.8, dash: '6 3',  label: null },
   };
 
-  // ── Pin positions (normalized 0-1, derived from lib/registry.py physical ports) ──
-  const COMP_PINS = {
-    SoilMoisture: { VCC:[0,.2], AO:[0,.5], AOUT:[0,.5], GND:[0,.8] },
-    Relay:        { VCC:[0,.12], GND:[0,.3], IN:[0,.5], COM:[1,.25], NO:[1,.5], NC:[1,.75] },
-    Pump:         { VCC:[0,.2], GND:[0,.8] },
-    Ultrasonic:   { VCC:[0,.12], TRIG:[0,.35], ECHO:[0,.58], GND:[0,.82] },
-    PIR:          { VCC:[0,.2], OUT:[0,.5], GND:[0,.8] },
-    TempHumid:    { VCC:[0,.2], DATA:[0,.5], GND:[0,.8] },
-    Servo:        { GND:[0,.2], VCC:[0,.5], SIGNAL:[0,.8], SIG:[0,.8] },
-    DCMotor:      { VCC:[0,.1], GND:[0,.25], ENA:[0,.42], IN1:[0,.58], IN2:[0,.75], '+12V':[0,.9], 'M+':[1,.35], 'M-':[1,.65] },
-    OLED:         { GND:[0,.12], VCC:[0,.35], SCL:[0,.58], SDA:[0,.82] },
-    LCD:          { GND:[0,.12], VCC:[0,.35], SDA:[0,.58], SCL:[0,.82] },
-    NeoPixel:     { DIN:[0,.2], DATA:[0,.2], VCC:[0,.5], GND:[0,.8] },
-    Buzzer:       { '+':[0,.35], SIG:[0,.35], I:[0,.35], GND:[0,.65] },
-    LED_Single:   { '+':[0,.35], Anode:[0,.35], SIG:[0,.35], GND:[0,.65] },
-    LED_RGB:      { R:[0,.12], GND:[0,.35], G:[0,.58], B:[0,.82] },
-    Speaker:      { VCC:[0,.25], GND:[0,.75], RX:[1,.35], TX:[1,.65] },
-    Light:        { LDR:[0,.12], AOUT:[0,.12], AO:[0,.12], DOUT:[0,.35], DO:[0,.35], VCC:[0,.58], GND:[0,.82] },
-    MSGEQ7:       { OUT:[0,.15], STROBE:[0,.4], RESET:[0,.65], VCC:[0,.85], GND:[0,.95] },
-    Button:       { SIG:[0,.3], VCC:[0,.6], GND:[0,.85] },
-    Switch:       { SIG:[0,.3], VCC:[0,.6], GND:[0,.85] },
-    Stepper:      { IN1:[0,.15], IN2:[0,.38], IN3:[0,.62], IN4:[0,.85], VCC:[0,.05], GND:[0,.95] },
-    BatteryAA:    { 'BAT+':[1,.3], VCC:[1,.3], 'BAT-':[1,.7], GND:[1,.7] },
-    BatteryLiPo:  { 'BAT+':[1,.3], VCC:[1,.3], 'BAT-':[1,.7], GND:[1,.7] },
-    USB5V:        { 'V+':[1,.3], VCC:[1,.3], 'V-':[1,.7], GND:[1,.7] },
-  };
+  // ── Pin positions ──
+  // P4.2/DEC-H7(2026-06-11):手猜 COMP_PINS 已 purge。腳位唯一來源 = SCHEM_PINS
+  // (v6/data/schematic-pins.js,由 scripts/derive_schematic_pins.py 從 verified.json
+  // pin_layout.header_groups 衍生,drift-gated)。禁止重建手填腳位表 —
+  // gate:tests/test_no_handcoded_when_class_data_exists.py。
 
   // ── Component physical dimensions (SSOT: data/component-dimensions.js) ──
   const REGISTRY_MM = window.REGISTRY_MM;
@@ -117,7 +96,6 @@
   // ── Exports ──
   window.COMP_SPECS = COMP_SPECS;
   window.WIRE_STYLES = WIRE_STYLES;
-  window.COMP_PINS = COMP_PINS;
   window.COMP_DIMS = COMP_DIMS;
   window.PIN_CLR = PIN_CLR;
   window._pinClr = _pinClr;

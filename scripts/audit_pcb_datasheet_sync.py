@@ -114,6 +114,19 @@ def audit_board(class_name: str, pcb_spec: PCBSpec, ds_entry: dict) -> list:
             })
             continue
 
+        if "w_mm" not in ds_match or "h_mm" not in ds_match:
+            missing = [k for k in ("w_mm", "h_mm") if k not in ds_match]
+            issues.append({
+                "board": class_name,
+                "type": "missing_field",
+                "component": sc.name,
+                "detail": (
+                    f"JSON datasheet entry for {sc.name} is missing "
+                    f"{','.join(missing)}"
+                ),
+            })
+            continue
+
         dl = ds_match.get("w_mm", 0)
         dw = ds_match.get("h_mm", 0)
         if abs(dl - sc.body_l) > 1.0 or abs(dw - sc.body_w) > 1.0:
@@ -212,10 +225,39 @@ def main():
                 print(f"  [{tag}] {iss['component']}: {iss['detail']}")
             total_issues += len(issues)
 
-        if fix_mode:
+        # Only touch boards that actually drifted, and MERGE generated schema
+        # fields into the existing component dicts (matched by normalized name)
+        # so hand-authored non-schema fields (id/label/notes/etc.) are NOT
+        # silently dropped. Boards with no issues are left untouched.
+        if fix_mode and issues:
             generated = generate_json_from_pcb(pcb_spec)
-            ds[class_name]["on_board_components"] = generated
-            print(f"  [FIX] Regenerated {len(generated)} components from SSOT")
+            existing = ds[class_name].get("on_board_components", [])
+            existing_by_name = {}
+            for c in existing:
+                n = c.get("name", c.get("id", ""))
+                existing_by_name[_normalize_name(n, class_name)] = c
+            merged = []
+            n_changed = 0
+            for gen in generated:
+                key = _normalize_name(gen["name"], class_name)
+                base = existing_by_name.get(key)
+                if base is None:
+                    merged.append(gen)
+                    n_changed += 1
+                    continue
+                out = dict(base)
+                changed_fields = [
+                    k for k, v in gen.items() if out.get(k) != v
+                ]
+                out.update(gen)
+                if changed_fields:
+                    n_changed += 1
+                merged.append(out)
+            ds[class_name]["on_board_components"] = merged
+            print(
+                f"  [FIX] Merged SSOT into {len(merged)} components "
+                f"({n_changed} changed), preserved non-schema fields"
+            )
 
     print(f"\n{'='*60}")
     print(f"Total issues: {total_issues}")

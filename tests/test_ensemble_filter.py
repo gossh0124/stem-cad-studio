@@ -58,7 +58,7 @@ class TestScoreSpatial:
             {"component": "Sensor-Ultrasonic-class", "zone": "mid-left"},
             {"component": "Motor-Servo-class", "zone": "bottom-center"},
         ]
-        score = _score_spatial({"layout": layout}, _SOLVER["placements"], _COMPONENTS)
+        score = _score_spatial({"layout": layout}, _COMPONENTS)
         assert score == 25.0
 
     def test_duplicate_zones_penalized(self):
@@ -66,16 +66,16 @@ class TestScoreSpatial:
             {"component": "A", "zone": "top-center"},
             {"component": "B", "zone": "top-center"},
         ]
-        score = _score_spatial({"layout": layout}, [], _COMPONENTS)
+        score = _score_spatial({"layout": layout}, _COMPONENTS)
         assert score < 25.0
 
     def test_empty_layout(self):
-        score = _score_spatial({}, [], _COMPONENTS)
+        score = _score_spatial({}, _COMPONENTS)
         assert score < 25.0
 
     def test_low_coverage(self):
         layout = [{"component": "A", "zone": "top-center"}]
-        score = _score_spatial({"layout": layout}, [], _COMPONENTS)
+        score = _score_spatial({"layout": layout}, _COMPONENTS)
         assert score < 25.0
 
 
@@ -122,12 +122,11 @@ class TestScoreClearance:
     def test_with_cable_routing(self):
         score = _score_clearance(
             {"layout": [{"component": "A"}], "cable_routing": {"path": "channel_bottom"}},
-            [],
         )
         assert score == 15.0
 
     def test_empty_layout(self):
-        score = _score_clearance({}, [])
+        score = _score_clearance({})
         assert score < 15.0
 
 
@@ -145,13 +144,13 @@ class TestScoreCandidate:
             thermal={"strategy": "passive_vent"},
             cable={"path": "channel_bottom"},
         )
-        total, bd = score_candidate(c, _SOLVER, _COMPONENTS)
+        total, bd = score_candidate(c, _COMPONENTS)
         assert total > 50.0
         assert all(v >= 0 for v in bd.values())
 
     def test_empty_candidate(self):
         c = _make_candidate()
-        total, bd = score_candidate(c, _SOLVER, _COMPONENTS)
+        total, bd = score_candidate(c, _COMPONENTS)
         assert 0 <= total <= 100
         assert "spatial" in bd
 
@@ -172,7 +171,7 @@ class TestPreFilter:
         )
         bad = _make_candidate()
 
-        ranked = pre_filter([bad, good], _SOLVER, _COMPONENTS, top_k=1)
+        ranked = pre_filter([bad, good], _COMPONENTS, top_k=1)
         assert len(ranked) == 1
         assert ranked[0][0] is good
         assert ranked[0][1] > 0
@@ -183,12 +182,12 @@ class TestPreFilter:
                                       {"component": "B", "zone": "z2"}])
         c3 = _make_candidate()
 
-        ranked = pre_filter([c1, c2, c3], _SOLVER, _COMPONENTS, top_k=2)
+        ranked = pre_filter([c1, c2, c3], _COMPONENTS, top_k=2)
         assert len(ranked) == 2
         assert ranked[0][1] >= ranked[1][1]
 
     def test_empty_list(self):
-        ranked = pre_filter([], _SOLVER, _COMPONENTS)
+        ranked = pre_filter([], _COMPONENTS)
         assert ranked == []
 
 

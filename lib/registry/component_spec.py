@@ -70,9 +70,12 @@ class ConnectorPort:
 class ComponentSpec:
     """Physical specification of a single component."""
     name: str
-    length_mm: float
-    width_mm: float
-    height_mm: float
+    # geometry L/W/H 由 registry_data Tier 1.5 從 verified.json physical 讀穿覆寫(B5-geo);
+    # _reg_*.py 不再帶字面值。預設 0.0 僅為建構佔位 —— registry build 對 verified.json 缺值的
+    # class 會 raise(no-silent-fallback),不會出貨 0;Motor-Stepper(WIP gap)仍保留 _reg 字面值。
+    length_mm: float = 0.0
+    width_mm: float = 0.0
+    height_mm: float = 0.0
     class_name: str = ""
     mounting_holes: List[MountingHole] = field(default_factory=list)
     ports: List[ConnectorPort] = field(default_factory=list)

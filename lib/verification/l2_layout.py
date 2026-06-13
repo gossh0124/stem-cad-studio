@@ -95,8 +95,19 @@ def _parse_labels_and_wires(svg: str):
         labels.append({"text": txt, "x": x, "y": y - fs, "w": w, "h": fs})
 
     wires = []
-    # wire = path with stroke-dasharray (信號線)；端點取 M 起點與最後座標
+    # wire = path with stroke-dasharray (信號線)；端點取 M 起點與最後座標。
+    # 只認真正帶 stroke-dasharray（屬性或 inline style）或 wire class 的 path，
+    # 避免邊框/元件外框等裝飾性 path 被誤計為信號線而灌水交叉數與門檻。
     for p in root.iter(f"{_SVG_NS}path"):
+        style = p.attrib.get("style", "")
+        cls = p.attrib.get("class", "")
+        is_wire = (
+            p.attrib.get("stroke-dasharray") is not None
+            or "stroke-dasharray" in style
+            or "wire" in cls.split()
+        )
+        if not is_wire:
+            continue
         d = p.attrib.get("d", "")
         nums = re.findall(r"-?\d+\.?\d*", d)
         if len(nums) >= 4:

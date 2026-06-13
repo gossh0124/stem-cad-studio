@@ -81,7 +81,13 @@ def add_case(bridge: dict, case_id: Optional[str] = None):
         try:
             db.create_table(COLL_CASES, data=[record])
         except Exception as e2:
-            _log.warning("Case write failed: %s", e2)
+            # No-Silent-Fallback: a doubly-failed write must not be reported
+            # as "Case indexed". Surface the failure to the caller.
+            _log.error("Case write failed: %s", e2)
+            raise RuntimeError(
+                f"Failed to index case {record['case_id']!r} "
+                f"({record['project_name']!r}): {e2}"
+            ) from e2
 
     _log.info("Case indexed: %s (%s)", record["project_name"], record["case_id"])
 

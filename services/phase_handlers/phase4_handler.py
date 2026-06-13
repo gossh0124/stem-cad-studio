@@ -39,7 +39,6 @@ from ._phase4_helpers import (
     merge_lora_b_into_solver as _merge_lora_b_into_solver,
     ensure_dir as _ensure_dir,
     safe_project_name as _safe_project_name,
-    has_multi_component_layout as _has_multi_component_layout,
     run_contract_validation as _run_contract_validation,
     _SAFE_PROJECT_NAME_FALLBACK,
 )
@@ -64,10 +63,10 @@ class Phase4Handler(PhaseHandler):
         from lib.pcb import PCB_REGISTRY
         from lib.cad import (
             build_pcb_two_piece,
-            build_assembly_two_piece,
             export_step,
             export_stl_high_density,
         )
+        from lib.cad.shell.assembly_v3_build import build_assembly_from_scene
         from lib.cad.mounts import ALL_MOUNTS, DEFAULT_MOUNT_SPECS
         from lib.registry import COMPONENT_REGISTRY
         from lib import shell_cache
@@ -94,7 +93,11 @@ class Phase4Handler(PhaseHandler):
         brain_pcb_spec = PCB_REGISTRY.get(brain_class) if brain_class else None
 
         # ── (1) Tier 4 機械接合件（mount dispatch）─────────────────
-        mount_class_set = set()
+        # mount_intent_set：依元件分類（spec.mount_kind + ALL_MOUNTS）判定為 mount 的
+        # class，與 build 成敗無關 → 路徑決策(non_mount_count)不受暫時性 build 失敗汙染。
+        # mount_built_set：實際成功生成 shell 的 class（僅供記錄/除錯）。
+        mount_intent_set = set()
+        mount_built_set = set()
         for comp in components:
             class_name = comp.get("type") or comp.get("class_name")
             spec = COMPONENT_REGISTRY.get(class_name)
@@ -104,6 +107,7 @@ class Phase4Handler(PhaseHandler):
                 continue
             if class_name not in ALL_MOUNTS:
                 continue
+            mount_intent_set.add(class_name)
             kind, label, builder = ALL_MOUNTS[class_name]
             mount_spec = DEFAULT_MOUNT_SPECS.get(kind)
             fp = shell_cache.fingerprint_for_spec(mount_spec) if mount_spec else 'na'
@@ -136,19 +140,38 @@ class Phase4Handler(PhaseHandler):
                     "step": str(step),
                     "tris": tris,
                 })
-                mount_class_set.add(class_name)
+                mount_built_set.add(class_name)
                 self._log(progress_cb, f"  ✅ {label}: {stl.name} ({tris}t)")
             except Exception as exc:
                 self._log(progress_cb, f"  ❌ {label} 失敗：{exc}")
                 _log.exception("mount 生成失敗")
 
         # ── (2) Assembly Solver ──────────────────────────────────
-        # 用寬鬆預設 enclosure_spec 讓 solver packing；主殼 builder 會依
-        # placements 動態收緊 bbox。
+        # enclosure_spec 是「最小底限」(autosize 以 max(min, packed_bbox+clearance) 收口)。
+        # 修正 2026-06-06：舊值 200×150×60 是硬性 floor → 小專案變空曠巨殼(18.9×)。但
+        # 純小底限(60×45)又小於大板(Arduino 68×53)→ MaxRects overflow → 非 watertight。
+        # 正解：floor = max(sane-min, 最大「內置」元件最長邊 + margin)，兩維皆 ≥ 最長邊
+        # → 任一元件旋轉後必放得下,不 overflow;autosize 仍會貼合放大。
+        try:
+            from lib.registry import COMPONENT_REGISTRY as _REG
+        except Exception:  # noqa: BLE001
+            _REG = {}
+        _longs, _talls = [], []
+        for _c in components:
+            _sp = _c.get("spec") or {}
+            _L, _W, _H = _sp.get("length_mm") or 0.0, _sp.get("width_mm") or 0.0, _sp.get("height_mm") or 0.0
+            _rspec = _REG.get(_c.get("type"))
+            _rel = getattr(_rspec, "enclosure_relation", "internal") if _rspec is not None else "internal"
+            if _rel != "internal" or not (_L and _W):
+                continue
+            _longs.append(max(_L, _W))
+            _talls.append(_H)
+        _maxlong = max(_longs) if _longs else 70.0
+        _maxtall = max(_talls) if _talls else 25.0
         solver_default_spec = {
-            "inner_length": 200.0,
-            "inner_width": 150.0,
-            "inner_height": 60.0,
+            "inner_length": round(max(70.0, _maxlong + 8.0), 1),
+            "inner_width": round(max(50.0, _maxlong + 8.0), 1),
+            "inner_height": round(max(35.0, _maxtall + 8.0), 1),
         }
         # user component fallback
         _user_spec_fn = None
@@ -159,26 +182,6 @@ class Phase4Handler(PhaseHandler):
             pass
 
         solver_result: Dict[str, Any] = {}
-        try:
-            from lib.assembly_solver import solve as assembly_solve
-            from lib.thermal_index import load_thermal_index
-
-            wiring_raw = bridge.get("wiring", {})
-            thermal_idx = load_thermal_index()
-            solver_result = assembly_solve(
-                components=components,
-                wiring_raw=wiring_raw,
-                enclosure_spec=solver_default_spec,
-                thermal_index=thermal_idx,
-                user_spec_fn=_user_spec_fn,
-            )
-            n_place = len(solver_result.get("placements", []))
-            n_wire = len(solver_result.get("wire_routes", []))
-            self._log(progress_cb,
-                      f"Assembly Solver: {n_place} placements, {n_wire} routes")
-        except Exception as exc:
-            self._log(progress_cb, f"⚠️  Assembly Solver failed: {exc}")
-            _log.exception("assembly solver failed")
 
         # ── (2a-v3) Assembly Solver V3 (SceneGraph) ─────────────────
         scene_graph_v3: Dict[str, Any] = {}
@@ -223,7 +226,7 @@ class Phase4Handler(PhaseHandler):
 
                     if candidates:
                         ranked = pre_filter(
-                            candidates, solver_result, components,
+                            candidates, components,
                             registry=COMPONENT_REGISTRY, top_k=1,
                         )
                         ch3_result = ranked[0][0]
@@ -272,17 +275,12 @@ class Phase4Handler(PhaseHandler):
             _log.exception("LoRA-B infer_plan_params failed")
 
         # ── (3) 主殼路徑決策（E10）────────────────────────────────
-        all_placements = solver_result.get("placements", [])
-        non_mount_placements = [p for p in all_placements
-                                if p.get("type") not in mount_class_set]
-        thermal_field = solver_result.get("thermal_field", {})
-        wire_routes = solver_result.get("wire_routes", [])
-        vent_placements = thermal_field.get("vent_placements", [])
+        non_mount_count = sum(1 for c in components if c.get("type") not in mount_intent_set)
 
         bottom_name = f'{project_name}_bottom'
         lid_name = f'{project_name}_top'
 
-        if _has_multi_component_layout(non_mount_placements):
+        if non_mount_count >= 2:
             # ── 多元件路徑（E10 + E11 + E12 + J1 + J2）─────────────
             try:
                 bottom_stl = proj_dir / f'{bottom_name}.stl'
@@ -297,11 +295,9 @@ class Phase4Handler(PhaseHandler):
                              if _lb_wall and 1.5 <= _lb_wall <= 3.5
                              else 2.0)
 
-                base_part, lid_part, asm_spec = build_assembly_two_piece(
-                    placements=non_mount_placements,
+                base_part, lid_part, asm_spec = build_assembly_from_scene(
+                    scene_graph_v3,
                     project_name=project_name,
-                    wire_routes=wire_routes,
-                    vent_placements=vent_placements,
                     wall=_wall_arg,
                 )
                 tris_b = export_stl_high_density(base_part, bottom_stl)
@@ -438,22 +434,12 @@ class Phase4Handler(PhaseHandler):
             "spec":              spec_dict,
             "component_shells":  component_shells,
         }
-        if solver_result.get("placements"):
-            bridge["cad_output"]["component_placements"] = solver_result["placements"]
         if solver_result.get("thermal_field"):
             bridge["cad_output"]["thermal_field"] = solver_result["thermal_field"]
-        if solver_result.get("wire_routes"):
-            bridge["cad_output"]["wire_routes"] = solver_result["wire_routes"]
         if solver_result.get("joints"):
             bridge["cad_output"]["joints"] = solver_result["joints"]
         if solver_result.get("_lora_b_rationale"):
             bridge["cad_output"]["assembly_rationale"] = solver_result["_lora_b_rationale"]
-        if solver_result.get("panel_placements"):
-            bridge["cad_output"]["panel_placements"] = solver_result["panel_placements"]
-        if solver_result.get("external_refs"):
-            bridge["cad_output"]["external_refs"] = solver_result["external_refs"]
-        if solver_result.get("embedded_refs"):
-            bridge["cad_output"]["embedded_refs"] = solver_result["embedded_refs"]
         if scene_graph_v3:
             bridge["cad_output"]["scene_graph_v3"] = scene_graph_v3
         # CH3 推論軌跡（v3 階層式 LoRA-B）

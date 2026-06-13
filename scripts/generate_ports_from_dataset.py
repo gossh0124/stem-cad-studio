@@ -91,7 +91,7 @@ def _ports_from_pin_layout(pl, comp_l, comp_w):
         x_min, x_max = min(xs), max(xs)
         y_min, y_max = min(ys), max(ys)
 
-        pitch = g.get("pitch_mm", 2.54)
+        pitch = g.get("pitch_mm", 2.54)  # nofallback-ok: WIRE/TERMINAL/EDGE 群組無標準 pitch（19/50 header_groups）
         pad_w = pitch * 0.6
 
         # Header bounding box
@@ -118,7 +118,7 @@ def _ports_from_pin_layout(pl, comp_l, comp_w):
             "color": "#c9b037",
             "shape": "conn-header-male",
             "pins": len(pins),
-            "pitch": g.get("pitch_mm", 2.54),
+            "pitch": g.get("pitch_mm", 2.54),  # nofallback-ok: 同上，非標準 header 群組無 pitch
         }
 
         # Determine side
@@ -137,11 +137,15 @@ def _ports_from_pin_layout(pl, comp_l, comp_w):
     return ports
 
 
-def _fallback_ports_for_simple(comp_key, phys, ident):
-    """Generate minimal ports for components without on_board_components."""
+def _fallback_ports_for_simple(comp_key, phys, ident, comp_l, comp_w):
+    """Generate minimal ports for components without on_board_components.
+
+    comp_l / comp_w: authoritative outer dimensions already validated by caller
+    (generate_all ensures l/w are non-None before calling this function).
+    """
     ports = []
-    l = phys.get("length_mm", 30)
-    w = phys.get("width_mm", 20)
+    l = comp_l
+    w = comp_w
 
     # LED-type: single dome element
     if "LED" in comp_key or "Lighting" in comp_key:
@@ -241,7 +245,7 @@ def _fallback_ports_for_simple(comp_key, phys, ident):
             })
 
     # Generic fallback
-    elif not ports:
+    else:
         ports.append({
             "side": "face",
             "x": round(l * 0.2, 1),
@@ -298,7 +302,7 @@ def generate_all():
 
         # 3. Fallback for simple components
         if not ports:
-            ports = _fallback_ports_for_simple(comp_key, phys, ident)
+            ports = _fallback_ports_for_simple(comp_key, phys, ident, l, w)
 
         results[comp_key] = {"l": l, "w": w, "h": h, "ports": ports}
 

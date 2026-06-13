@@ -256,5 +256,16 @@ class TestCheckWiring:
         assert ok is False
 
     def test_empty_components(self):
+        # No-Silent-Fallback: with no Brain component present, the EW8 check
+        # refuses to estimate against a default MCU and fails loud (ok=False)
+        # instead of silently passing. (If lib.wiring is unavailable the EW8
+        # block is skipped via ImportError and basic rules pass; assert the
+        # honest verdict either way.)
         ok, results = check_wiring([])
-        assert ok is True
+        ew8_err = [r for r in results
+                   if r["rule"] == "EW8" and r["level"] == "ERROR"]
+        if ew8_err:
+            assert ok is False
+            assert any("Brain" in r["msg"] for r in ew8_err)
+        else:
+            assert ok is True

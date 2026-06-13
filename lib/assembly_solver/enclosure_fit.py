@@ -134,7 +134,6 @@ def pack_compact(
                      for r in (0.6, 0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.5, 2.0)})
 
     best = None       # smallest-area overlap-free candidate
-    fallback = None   # smallest-area candidate regardless (last resort)
     for width in widths:
         raw = pack_fn(pack_mods, width, tall)
         placed: List[ComponentModule] = []
@@ -145,13 +144,19 @@ def pack_compact(
         il, iw, ih = autosize_enclosure(
             placed, positions, min_l, min_w, min_h, panel_max_h)
         cand = (il * iw, placed, positions, il, iw, ih)
-        if fallback is None or cand[0] < fallback[0]:
-            fallback = cand
         if not _packing_overlap(placed, positions):
             if best is None or cand[0] < best[0]:
                 best = cand
 
-    _, placed, positions, il, iw, ih = best or fallback
+    if best is None:
+        # Every trial width overlapped: returning `fallback` would violate the
+        # stated overlap-free invariant silently. Fail loud instead.
+        raise RuntimeError(
+            "pack_compact: no overlap-free packing found across "
+            f"{len(widths)} trial widths for {len(pack_mods)} modules; "
+            "refusing to return an overlapping fallback (no-overlap invariant)."
+        )
+    _, placed, positions, il, iw, ih = best
     return placed, positions, il, iw, ih
 
 
@@ -211,8 +216,14 @@ def place_buckets(
                 dims = hs.get("dimensions") or {}
                 host_l = float(dims.get("length_mm", m.length * 2))
                 host_w = float(dims.get("width_mm", m.width * 2))
-                u = float(ep.get("u", 0.5))
-                v = float(ep.get("v", 0.5))
+                # H7/NSF: missing u/v must fail loud, not silent-center at 0.5.
+                if "u" not in ep or "v" not in ep:
+                    raise ValueError(
+                        f"{getattr(m, 'comp_type', '<module>')}: embedded entry_port 缺少 u/v "
+                        f"(got {ep!r})，拒絕靜默置中 0.5"
+                    )
+                u = float(ep["u"])
+                v = float(ep["v"])
                 host_x0 = il / 2 - host_l / 2
                 host_y0 = iw + _EXTERNAL_GAP
                 allp.append((round(host_x0 + u * host_l - m.length / 2, 1),

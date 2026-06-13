@@ -8,7 +8,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Display-OLED-class': ComponentSpec(
         name='SSD1306 OLED 0.96 inch I2C', class_name='Display-OLED-class',
         tags=['bus:i2c', 'display:graphics'],
-        length_mm=27.0, width_mm=27.0, height_mm=4.0,
         mounting_holes=[
             MountingHole(x=2.5, y=2.5, diameter=2.0), MountingHole(x=24.5, y=2.5, diameter=2.0),
             MountingHole(x=2.5, y=24.5, diameter=2.0), MountingHole(x=24.5, y=24.5, diameter=2.0),
@@ -24,7 +23,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Display-LCD-class': ComponentSpec(
         name='LCD 1602 I2C Module', class_name='Display-LCD-class',
         tags=['bus:i2c', 'display:text'],
-        length_mm=80.0, width_mm=36.0, height_mm=12.0,
         mounting_holes=[
             MountingHole(x=2.5, y=2.5, diameter=2.5), MountingHole(x=77.5, y=2.5, diameter=2.5),
             MountingHole(x=2.5, y=33.5, diameter=2.5), MountingHole(x=77.5, y=33.5, diameter=2.5),
@@ -40,7 +38,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Display-EInk-class': ComponentSpec(
         name='2.9 inch E-Ink Display (SPI)', class_name='Display-EInk-class',
         tags=['bus:spi', 'display:graphics'],
-        length_mm=89.0, width_mm=38.0, height_mm=5.0,
         mounting_holes=[MountingHole(x=3.0, y=3.0, diameter=2.0), MountingHole(x=86.0, y=35.0, diameter=2.0)],
         ports=[
             ConnectorPort(name='VCC',  port_type='PWR',  x=2.00,  y=0.0, width=2.54, height=2.54, side='face'),
@@ -57,7 +54,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'LED-Matrix-class': ComponentSpec(
         name='MAX7219 8x8 LED Matrix Module', class_name='LED-Matrix-class',
         tags=['bus:spi', 'display:dot_matrix'],
-        length_mm=32.0, width_mm=32.0, height_mm=13.0,
         mounting_holes=[MountingHole(x=2.5, y=2.5, diameter=3.0), MountingHole(x=29.5, y=29.5, diameter=3.0)],
         ports=[
             ConnectorPort(name='VCC',  port_type='PWR',  x=2.00,  y=0.0, width=2.54, height=2.54, side='face'),
@@ -72,7 +68,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Lighting-LED-RGB-class': ComponentSpec(
         name='5mm RGB LED (Common Cathode)', class_name='Lighting-LED-RGB-class',
         tags=['gpio:pwm', 'light:rgb'],
-        length_mm=5.0, width_mm=5.0, height_mm=8.6,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='R',   port_type='GPIO', x=0.5, y=0.0, width=1.0, height=1.0, side='face'),
@@ -85,7 +80,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Lighting-LED-Strip-class': ComponentSpec(
         name='Generic LED Strip 5V (10cm segment)', class_name='Lighting-LED-Strip-class',
         tags=['gpio:digital', 'light:strip'],
-        length_mm=100.0, width_mm=10.0, height_mm=3.0,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='VCC', port_type='PWR',  x=2.0, y=5.0, width=3.0, height=2.0, side='left'),
@@ -96,8 +90,9 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Lighting-NeoPixel-class': ComponentSpec(
         name='WS2812B NeoPixel Strip (8 LEDs)', class_name='Lighting-NeoPixel-class',
         tags=['gpio:digital', 'light:addressable'],
-        length_mm=50.0, width_mm=10.0, height_mm=3.0,
-        mounting_holes=[],
+        # B5-coord 2026-06-12: 2 mounting holes from Adafruit NeoPixel-Sticks official EagleCAD
+        # .brd (Product 1426), MOUNTINGHOLE_2.0_PLATED pads drill 2.2mm — Tier-A, SSOT-frame verbatim.
+        mounting_holes=[MountingHole(x=12.7, y=8.128, diameter=2.2), MountingHole(x=38.1, y=8.128, diameter=2.2)],
         ports=[
             ConnectorPort(name='VCC',  port_type='PWR',  x=0.0, y=5.0, width=3.0, height=2.0, side='left'),
             ConnectorPort(name='DIN',  port_type='GPIO', x=0.0, y=2.0, width=3.0, height=2.0, side='left'),
@@ -108,7 +103,6 @@ DISPLAY_COMPONENTS: dict[str, ComponentSpec] = {
     'Lighting-LED-PWM-class': ComponentSpec(
         name='Single PWM-Dimmable LED (5mm)', class_name='Lighting-LED-PWM-class',
         tags=['gpio:pwm', 'light:single'],
-        length_mm=5.0, width_mm=5.0, height_mm=8.6,
         mounting_holes=[],
         ports=[
             ConnectorPort(name='Anode',   port_type='GPIO', x=1.5, y=0.0, width=1.0, height=1.0, side='face'),

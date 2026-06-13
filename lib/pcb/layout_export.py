@@ -122,7 +122,14 @@ _MH_PARAMS = dict(diameter=3.2, padDia=6.4)
 
 def arduino_brd_centers(brd_path: Optional[str] = None) -> Dict[str, BrdElement]:
     """回 {後端 SubComponent.name: BrdElement}（已對映 .brd element）。"""
-    elems = parse_brd(brd_path or _ARDUINO_BRD)
+    path = brd_path or _ARDUINO_BRD
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            "EAGLE .brd SSOT 來源缺失，layout_export 無法衍生佈局。\n"
+            f"  預期路徑：{os.path.abspath(path)}\n"
+            "  此資料檔（data/pcb_sources/arduino_uno_r3/eagle_official/UNO-TH_Rev3e.brd）"
+            "未隨 repo 提供，請還原後再執行（V2 archive 內存有此檔）。")
+    elems = parse_brd(path)
     out: Dict[str, BrdElement] = {}
     for be_name, el_name in ARDUINO_ELEMENT_MAP.items():
         if el_name in elems:
@@ -238,13 +245,50 @@ def extract_arduino_section(js_text: str) -> str:
     return body.rstrip("\n").rstrip()
 
 
+_BEGIN_MARKER_LINE = (
+    "    " + SECTION_BEGIN
+    + " — 勿手改，重跑：.venv/Scripts/python.exe -m lib.pcb.layout_export --write")
+_END_MARKER_LINE = "    " + SECTION_END
+_LEGACY_COMMENT_LINE = (
+    "    // ── Legacy（前端邊緣 header 方向慣例屬 VS-AXIS，暫保留手填）見 problem.md VS-PCB ──")
+
+
+def _bootstrap_markers(text: str) -> str:
+    """marker 不存在時，自動框出 Arduino-Uno-class 的 SSOT 段。
+
+    EAGLE-derived 段（exporter 只輸出 side='face' port）一律進 marker；前端邊緣
+    header（side 'left'/'right'）非 .brd placement 衍生，保留為 marker 後的 legacy。
+    這不是手改 SSOT 內容，而是把 exporter 寫入點（marker）以程式還原。
+    """
+    import re
+
+    m = re.search(r'("Arduino-Uno-class"\s*:\s*\{[^\[]*ports:\s*\[\n)(.*?)(\n\s*\]\s*\},)',
+                  text, re.DOTALL)
+    if not m:
+        raise ValueError("找不到 Arduino-Uno-class ports 陣列，無法 bootstrap marker")
+    head, body, tail = m.group(1), m.group(2), m.group(3)
+    legacy_lines = [ln.rstrip().rstrip(",") for ln in body.split("\n")
+                    if "side: 'left'" in ln or "side: 'right'" in ln]
+    # legacy 之間以逗號分隔，最後一行不帶尾逗號（其前的 SSOT 段末行已帶逗號）。
+    legacy_block = "\n".join(
+        ln + ("," if i < len(legacy_lines) - 1 else "")
+        for i, ln in enumerate(legacy_lines))
+    new_array = (head
+                 + _BEGIN_MARKER_LINE + "\n"
+                 + _END_MARKER_LINE + "\n"
+                 + _LEGACY_COMMENT_LINE + "\n"
+                 + legacy_block
+                 + tail)
+    return text[:m.start()] + new_array + text[m.end():]
+
+
 def write_arduino_section(js_path: Optional[str] = None) -> bool:
     """把 SSOT 段重寫進 component-dimensions.js（marker 之間）。回 True 若有變更。"""
     path = js_path or _DIMS_JS
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
     if SECTION_BEGIN not in text or SECTION_END not in text:
-        raise ValueError("component-dimensions.js 缺 SSOT-AUTO-GENERATED marker，無法自動寫入")
+        text = _bootstrap_markers(text)
 
     pre, rest = text.split(SECTION_BEGIN, 1)
     begin_line = SECTION_BEGIN + rest[:rest.index("\n")]   # begin marker 整行（含尾註）

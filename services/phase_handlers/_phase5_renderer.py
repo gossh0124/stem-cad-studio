@@ -56,6 +56,29 @@ def render_multiview(
                 png_path = str(out_dir / f"view_{view_name}.png")
                 try:
                     sc2 = scene.copy()
+                    # Position the camera along the requested view direction so
+                    # each PNG renders a distinct angle. Without this every copy
+                    # would reuse the default auto-framed camera and all six
+                    # views would render from the identical default viewpoint.
+                    bounds = sc2.bounds
+                    center = bounds.mean(axis=0)
+                    extents = bounds[1] - bounds[0]
+                    distance = float(np.linalg.norm(extents)) * 1.5 or 1.0
+                    direction = np.asarray(axis, dtype=float)
+                    norm = float(np.linalg.norm(direction))
+                    if norm > 0:
+                        direction = direction / norm
+                    cam_eye = center + direction * distance
+                    # Build a look-at transform: camera at cam_eye, looking at
+                    # the scene center. trimesh's look_at frames the given
+                    # points; we then place the eye on the requested axis.
+                    cam_tf = trimesh.scene.cameras.look_at(
+                        points=np.asarray([center]),
+                        fov=sc2.camera.fov,
+                        distance=distance,
+                    )
+                    cam_tf[:3, 3] = cam_eye
+                    sc2.camera_transform = cam_tf
                     png = sc2.save_image(
                         resolution=(640, 480),
                         background=[20, 20, 30, 255],

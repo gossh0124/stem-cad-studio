@@ -204,16 +204,20 @@ class TestDiagonalFallback:
         ), ambient_c=25.0)
         assert r[1]['temp_c'] == pytest.approx(25.0, abs=0.01)
 
-    def test_no_numpy_uses_diagonal(self):
+    def test_no_numpy_raises_on_coupled_network(self):
+        # No-Silent-Fallback: a coupled multi-node solve without numpy must
+        # NOT silently drop the off-diagonal coupling terms (which would yield
+        # systematically lower/incorrect junction temps). It must raise so the
+        # deployment defect (missing numpy) surfaces.
         import lib.assembly_solver.thermal_rc as mod
         orig = mod._HAS_NUMPY
         try:
             mod._HAS_NUMPY = False
-            r = solve_steady_state(_net(
-                [_node('U1', 50.0, 100.0), _node('U2', 50.0, 0.0, pos=(10, 0))],
-                [{'from': 'U1', 'to': 'U2', 'r_coupling': 100.0}],
-            ), ambient_c=25.0)
-            assert r[1]['temp_c'] == pytest.approx(25.0, abs=0.01)
+            with pytest.raises(RuntimeError, match="numpy"):
+                solve_steady_state(_net(
+                    [_node('U1', 50.0, 100.0), _node('U2', 50.0, 0.0, pos=(10, 0))],
+                    [{'from': 'U1', 'to': 'U2', 'r_coupling': 100.0}],
+                ), ambient_c=25.0)
         finally:
             mod._HAS_NUMPY = orig
 
@@ -318,3 +322,40 @@ class TestRealPCBSpecs:
         report = thermal_rc_report(ESP32_DEVKIT_V1, mode='typical')
         assert len(report['nodes']) >= 2
         assert report['max_temp_c'] > 25.0
+
+
+# ── A5.1: ic_thermal_for scene-graph integration ─────────────────────
+
+class TestICThermalFor:
+    """A5.1: per-IC junction temps (ADR-10 RC network) joined with board position,
+    for the assembly scene graph. ic_thermal_for() wires the thermal_rc solver into
+    the pipeline (enables IC-granularity thermal overlay)."""
+
+    def test_arduino_ic_thermal_present_and_grounded(self):
+        from lib.assembly_solver.thermal_rc import ic_thermal_for
+        ic = ic_thermal_for("Arduino-Uno-class")
+        names = {e["name"] for e in ic}
+        assert {"ATmega328P", "V-Reg-5V", "ATmega16U2", "LP2985-3V3"} <= names, names
+        atmega = next(e for e in ic if e["name"] == "ATmega328P")
+        assert 25.0 < atmega["temp_c"] < 60.0, f"ATmega328P temp out of range: {atmega}"
+        assert abs(atmega["anchor_x"] - 46.355) < 0.1, f"anchor_x drift: {atmega}"
+        for e in ic:
+            assert e["temp_c"] >= e["delta_t"]  # temp_c = ambient + delta_t
+            assert {"anchor_x", "anchor_y", "body_l", "body_w", "power_mw"} <= set(e)
+
+    def test_non_pcb_module_returns_empty_not_raise(self):
+        from lib.assembly_solver.thermal_rc import ic_thermal_for
+        assert ic_thermal_for("Button-class") == []
+
+    def test_raise_on_thermal_subs_no_nodes(self):
+        """ValueError must surface when thermal sub-components exist but RC solve yields no nodes."""
+        from unittest.mock import patch
+        from lib.assembly_solver.thermal_rc import ic_thermal_for
+        empty_report = {
+            'nodes': [], 'max_temp_c': 0.0, 'max_delta_t': 0.0,
+            'ambient_c': 25.0, 'mode': 'typical', 'coupling_count': 0,
+            'warnings': [], 'board_name': 'MockPCB',
+        }
+        with patch('lib.assembly_solver.thermal_rc.thermal_rc_report', return_value=empty_report):
+            with pytest.raises(ValueError, match="refusing silent empty ic_thermal"):
+                ic_thermal_for("Arduino-Uno-class")

@@ -1,6 +1,7 @@
 """gateway/routes_design.py — 設計輔助 API + 元件殼 + Artifact + User Components。"""
 from __future__ import annotations
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,7 @@ from ..shared.auth import get_token_job_id, require_job_owner
 from lib.ui_constants import get_ui_constants
 
 router = APIRouter()
+_log = logging.getLogger(__name__)
 
 _SHELLS_DIR = Path(__file__).resolve().parent.parent.parent / "shells"
 _DATASHEET_JSON = Path(__file__).resolve().parent.parent.parent / "data" / "component_datasheet_verified.json"
@@ -79,21 +81,45 @@ class DesignRequest(BaseModel):
 
 @router.post("/api/v1/wiring")
 async def api_wiring(req: DesignRequest):
-    from lib.wiring import to_json, PinAllocationError
+    from lib.wiring import to_json, PinAllocationError, PowerInjectError
+    from lib.ssot_completeness import check_components, incomplete_detail
+    # PB1: SSOT completeness gate — refuse to render with a NAMED gap rather than
+    # silently fall back to a generic/wrong circuit (no-silent-fallback principle).
+    # Ported from StemAiAgentV2 during V3 migration; the clean product had removed it.
+    bad = check_components(req.outputs + req.sensors, paths=("wiring",))
+    if bad:
+        raise HTTPException(422, incomplete_detail(bad))
     try:
-        return to_json(req.brain, req.outputs + req.sensors)
+        return to_json(req.brain, req.outputs + req.sensors, power=req.power)
     except PinAllocationError as e:
         raise HTTPException(422, f"接線無法分配（設計問題：pin 不足或不符）：{e}")
+    except PowerInjectError as e:
+        # 不可解析/不相容的電源源(UnknownPowerSourceError 為其子類)→ 422，而非靜默捏造
+        # V_USB 替代並回 200（no-silent-fallback / DEC-H7）。
+        raise HTTPException(422, f"電源無法分配（設計問題：未知或不相容的電源源）：{e}")
 
 
 @router.post("/api/v1/schematic")
 async def api_schematic(req: DesignRequest):
     from lib.schematic import to_json
     from lib.wiring import PinAllocationError
+    from lib.ssot_completeness import check_components, incomplete_detail
+    # PB1: SSOT completeness gate（與 /api/v1/wiring 一致）— 原理圖渲染同一組元件的接線，
+    # 不完整的 SSOT 應回 NAMED 422，而非靜默畫出 fallback/錯誤原理圖（no-silent-fallback）。
+    # test_completeness_gate.TestCompletenessRuntimeGate 的 docstring 早已承諾 api_schematic
+    # 亦 refuse，惟先前僅 api_wiring 接上 → 此處補齊。注：schematic 的 power 僅用於繪製電源
+    # 標籤、不走 power-injection，故無 api_wiring 的 PowerInjectError 路徑（不加死碼 handler）。
+    bad = check_components(req.outputs + req.sensors, paths=("wiring",))
+    if bad:
+        raise HTTPException(422, incomplete_detail(bad))
     try:
         return to_json(req.brain, req.power, req.outputs, req.sensors)
     except PinAllocationError as e:
         raise HTTPException(422, f"原理圖接線無法分配（設計問題）：{e}")
+    except ValueError as e:
+        # 未知/不適配電源等無效設計輸入（generate_svg fail-before-render）→ 422，
+        # 與 /api/v1/wiring 對未知電源回 422 一致（每個專案都應有適配電源）。
+        raise HTTPException(422, f"原理圖設計問題（電源或輸入不適配）：{e}")
 
 
 @router.post("/api/v1/firmware")
@@ -160,8 +186,8 @@ async def list_shells():
             if meta_path.exists():
                 try:
                     meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
+                except (json.JSONDecodeError, OSError) as e:
+                    _log.warning("shell meta.json 損壞/無法讀取，tri_count 退回 0：%s（%s）", meta_path, e)
             result.append({"type": d.name, "tri_count": meta.get("tri_count", 0)})
     return {"shells": result}
 
@@ -213,8 +239,8 @@ async def serve_shell_meta(comp_type: str):
         if p.exists():
             try:
                 result[fname.replace(".json", "")] = json.loads(p.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError) as e:
+                _log.warning("shell meta JSON 損壞/無法讀取，略過 %s：%s（%s）", fname, p, e)
     return result
 
 
@@ -325,8 +351,11 @@ async def serve_artifact(kind: str, project_id: Optional[str] = None, token_job_
     kind = kind.lower()
     if kind not in _ARTIFACT_MIME:
         raise HTTPException(400, f"不支援的 artifact 類型：{kind}")
-    if project_id:
-        require_job_owner(token_job_id, project_id)
+    # SEC: 必須帶 project_id 並通過 ownership 檢查；不可走無 scope 的全域 newest-file
+    # fallback（會跨 job/tenant 洩漏其他人的 artifact — IDOR）。
+    if not project_id:
+        raise HTTPException(400, "project_id 為必填（避免跨 job 洩漏 artifact）")
+    require_job_owner(token_job_id, project_id)
     path = _resolve_artifact_path(kind, project_id)
     if not path or not path.exists():
         raise HTTPException(404, f"{kind.upper()} 檔案尚未產生")

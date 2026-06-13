@@ -119,9 +119,24 @@ class AsyncExecutorMixin:
                 if job.status in (JobStatus.FAILED, JobStatus.CANCELLED):
                     return job
             else:
-                _emit(progress_cb,
-                    f"⚠️ 已達 {self.MAX_GATE_ITERATIONS} 次 P2 替換上限，"
-                    f"強制繼續")
+                # 達到替換上限但 gate 從未回傳 "continue" → 電源警告仍未解除。
+                # 不可強制繼續送進 CAD 生成;除非使用者明確 override(bridge
+                # 上 power_warning_phase2.user_override),否則 fail job。
+                _pwr = bridge.get("power_warning_phase2") or {}
+                if _pwr.get("user_override"):
+                    _emit(progress_cb,
+                        f"⚠️ 已達 {self.MAX_GATE_ITERATIONS} 次 P2 替換上限，"
+                        f"使用者 override,繼續")
+                else:
+                    _emit(progress_cb,
+                        f"❌ 已達 {self.MAX_GATE_ITERATIONS} 次 P2 替換上限,"
+                        f"電源約束仍未通過 — 中止 Pipeline")
+                    job.status = JobStatus.FAILED
+                    job.error = (
+                        f"P2 power gate 在 {self.MAX_GATE_ITERATIONS} 次替換後"
+                        f"仍未通過電源約束;未設定 user_override,中止。")
+                    self._queue.update(job)
+                    return job
             job.status = JobStatus.RUNNING
             self._queue.update(job)
         elif self._resume_from > 2:
@@ -152,9 +167,24 @@ class AsyncExecutorMixin:
                 if job.status in (JobStatus.FAILED, JobStatus.CANCELLED):
                     return job
             else:
-                _emit(progress_cb,
-                    f"⚠️ 已達 {self.MAX_GATE_ITERATIONS} 次替換上限，"
-                    f"強制繼續")
+                # 達到替換上限但 gate 從未回傳 "continue" → 電氣約束仍未通過
+                # (phase3_constraint_check.overall_ok=False)。async 路徑無
+                # phase_preflight 把關,不可強制繼續;除非 user_override,否則 fail。
+                _check = bridge.get("phase3_constraint_check", {}) or {}
+                if _check.get("user_override"):
+                    _emit(progress_cb,
+                        f"⚠️ 已達 {self.MAX_GATE_ITERATIONS} 次替換上限，"
+                        f"使用者 override,繼續")
+                else:
+                    _emit(progress_cb,
+                        f"❌ 已達 {self.MAX_GATE_ITERATIONS} 次替換上限,"
+                        f"電氣約束仍未通過 — 中止 Pipeline")
+                    job.status = JobStatus.FAILED
+                    job.error = (
+                        f"P3 constraint gate 在 {self.MAX_GATE_ITERATIONS} 次替換後"
+                        f"仍未通過電氣約束 (overall_ok=False);未設定 user_override,中止。")
+                    self._queue.update(job)
+                    return job
             job.status = JobStatus.RUNNING
             self._queue.update(job)
         elif self._resume_from > 3:

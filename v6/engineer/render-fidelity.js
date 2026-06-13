@@ -40,9 +40,9 @@
     if (kind === 'pcbBody') {
       t.pcbBody = source;
     } else if (kind === 'error') {
-      t.errors.push(Object.assign({ source: source }, meta || {}));
+      t.errors.push(Object.assign({ source: source }, meta || /* nofallback-ok: meta 為 optional 裝飾性 color/label，Object.assign 防呆非幾何缺值 */ {}));
     } else {
-      t.ports.push(Object.assign({ source: source }, meta || {}));
+      t.ports.push(Object.assign({ source: source }, meta || /* nofallback-ok: meta 為 optional 裝飾性 color/label，Object.assign 防呆非幾何缺值 */ {}));
     }
     if (meta && meta.color) t.colors.push(meta.color);
   }

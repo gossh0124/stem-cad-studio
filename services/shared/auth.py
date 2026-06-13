@@ -17,13 +17,24 @@ from fastapi import Header, HTTPException, WebSocket
 _log = logging.getLogger(__name__)
 _SECRET = os.environ.get("CADHLLM_JWT_SECRET", "")
 if not _SECRET:
-    _SECRET = "cadhllm-dev-secret-change-in-prod"
-    warnings.warn(
-        "CADHLLM_JWT_SECRET not set — using insecure dev default. "
-        "Set the env var before deploying to production.",
-        stacklevel=1,
-    )
-    _log.warning("CADHLLM_JWT_SECRET not set, using insecure dev fallback")
+    # A hardcoded HS256 secret lets anyone forge job-ownership tokens, so the
+    # dev fallback must be explicitly opted into. Without the opt-in flag, fail
+    # loudly instead of silently signing/verifying with a publicly-known key.
+    if os.environ.get("CADHLLM_ALLOW_DEV_SECRET", "").lower() in ("1", "true", "yes"):
+        _SECRET = "cadhllm-dev-secret-change-in-prod"
+        warnings.warn(
+            "CADHLLM_JWT_SECRET not set — using insecure dev default because "
+            "CADHLLM_ALLOW_DEV_SECRET is enabled. Never do this in production.",
+            stacklevel=1,
+        )
+        _log.warning("CADHLLM_JWT_SECRET not set, using insecure dev fallback")
+    else:
+        raise RuntimeError(
+            "CADHLLM_JWT_SECRET is not set. Refusing to start with a hardcoded "
+            "JWT secret, which would allow forgery of job-ownership tokens. "
+            "Set CADHLLM_JWT_SECRET, or set CADHLLM_ALLOW_DEV_SECRET=1 for "
+            "local development only."
+        )
 _ALGORITHM = "HS256"
 _DEFAULT_EXPIRE = timedelta(hours=2)
 

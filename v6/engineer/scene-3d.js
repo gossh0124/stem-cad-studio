@@ -7,22 +7,20 @@
 (() => {
   // ─── 角色 → 固定 RGB（用於 mesh 材質 fill） ─────────────────
 
-  const ROLE_RGB = {
-    Brain:   [125, 211, 252],  // sky blue
-    Power:   [250, 204, 21],   // amber
-    Control: [74, 222, 128],   // green
-    Sensor:  [125, 211, 252],  // sky blue
-    Output:  [180, 130, 255],  // purple
-  };
+  // Wave B: 衍生自 window.ROLE_PALETTE 單一 SSOT（component-dimensions.js 先載入，
+  // load-order 安全）;hex → [r,g,b] 0-255。保留 Output 別名（= Actuator，向後相容）。
+  const _hexRgb = (h) => { const n = parseInt(String(h).replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const ROLE_RGB = Object.fromEntries(Object.entries(window.ROLE_PALETTE || {}).map(([r, h]) => [r, _hexRgb(h)]));  // nofallback-ok: 載入順序守衛,色表缺=空 map,角色色屬 UI 分類(b 類)非數值資料
+  if (ROLE_RGB.Actuator) ROLE_RGB.Output = ROLE_RGB.Actuator;
 
   // ─── Model mesh cache (for pre-built GLB/mesh models) ─────────────
   // Registry loaded by HTML init; mesh cache populated on demand
   // Render priority: cached mesh → procedural builder → ghost box
-  window.__MODEL_MESHES = window.__MODEL_MESHES || {};
+  window.__MODEL_MESHES = window.__MODEL_MESHES || {};  // nofallback-ok: global mesh cache lazy-init，非資料降級
 
   function _modelKey(shape, params) {
     if (!shape) return null;
-    const p = params || {};
+    const p = params || {};  // nofallback-ok: params 為 optional option-bag，null 時視同空參數
     return [shape, p.pins || '', p.pitch || '', p.rows || ''].join(':');
   }
 
@@ -139,9 +137,9 @@
 
       // VS-FE: 用「當前 base/lid opacity」建 mesh（非硬編 0.82）。否則 geometry 重建會把
       // toggle 關掉的圖層以 0.82 重新顯示 —— 這是「人為旋轉/auto-rotate 後回復初始全顯示」主因。
-      const baseMesh = _buildSubMesh(0, baseLen, 'stlMesh', baseOpacity ?? 0.82);
+      const baseMesh = _buildSubMesh(0, baseLen, 'stlMesh', baseOpacity ?? 0.82); // nofallback-ok: 0.82 是 UI 半透明預設，props 未傳時顯示標準透明度，非幾何/spec 降級
       if (triangles?._hasLid) {
-        _buildSubMesh(baseLen, triangles.length - baseLen, 'stlMeshLid', lidOpacity ?? 0.82);
+        _buildSubMesh(baseLen, triangles.length - baseLen, 'stlMeshLid', lidOpacity ?? 0.82); // nofallback-ok: 0.82 是 lid 圖層 UI 預設透明度，非 spec 值
       }
 
       // PCB body: GLB (multi-color) → STL (single-color) → fallback box
@@ -254,7 +252,7 @@
 
         // ── Port overlays (STL / box only; GLB 已含 IC/LED/pin 子 mesh，疊加會重複) ──
         const ports = pcbBody.ports;
-        const SHAPES = { ...(window.__IC_CONN_SHAPES || {}), ...(window.__PASSIVE_MECH_SHAPES || {}) };
+        const SHAPES = { ...(window.__IC_CONN_SHAPES || {}), ...(window.__PASSIVE_MECH_SHAPES || {}) };  // nofallback-ok: shape registry 可選載入，缺失由 ghost box + console.error 覆蓋
         if (ports && ports.length && !(pcbBody.glbMeshes?.length)) {
           const group = new T.Group();
           group.name = 'pcbPorts';
@@ -268,7 +266,7 @@
             let portGroup = null;
 
             // Priority 1: Pre-loaded mesh model (OCP tessellation → mesh.json)
-            const mKey = _modelKey(p.shape, p.params || { pins: p.pins, pitch: p.pitch, rows: p.rows });
+            const mKey = _modelKey(p.shape, p.params || { pins: p.pins, pitch: p.pitch, rows: p.rows });  // nofallback-ok: 舊版 flat-port 格式相容橋接，非幾何值降級
             const meshData = mKey && window.__MODEL_MESHES[mKey];
             if (meshData && meshData.parts) {
               portGroup = new T.Group();
@@ -291,10 +289,10 @@
                   geo.computeVertexNormals();
                 }
                 if (part.indices) geo.setIndex(new T.BufferAttribute(new Uint32Array(part.indices), 1));
-                const [cr, cg, cb] = part.color || [128, 128, 128];
+                const [cr, cg, cb] = part.color || [128, 128, 128];  // nofallback-ok: mesh.json part.color 為 UI 選填，缺失以中灰顯示
                 const mt = new T.MeshPhysicalMaterial({
                   color: new T.Color(cr / 255, cg / 255, cb / 255),
-                  roughness: part.roughness ?? 0.5, metalness: part.metalness ?? 0.1,
+                  roughness: part.roughness ?? 0.5, metalness: part.metalness ?? 0.1, // nofallback-ok: PBR 材質視覺選填欄位（mesh.json），0.5/0.1 為合理 UI 裝飾預設，非幾何 spec
                   side: T.DoubleSide,
                 });
                 const m = new T.Mesh(geo, mt); m.castShadow = true;
@@ -314,11 +312,11 @@
                     const bw = pr.bodyW || pr.diameter || 4;
                     const bh = pr.bodyD || pr.rowSpacing || bw;
                     const bd = pr.bodyH || pr.height || Math.min(bw, bh) * 0.4;
-                    portGroup = builder(bw, bh, bd, sc, p.color || '#888', pr);
+                    portGroup = builder(bw, bh, bd, sc, p.color || '#888', pr); // nofallback-ok: port UI 顏色屬性選填，'#888' 為裝飾性預設灰
                   } else {
                     const pw = p.w || 4, ph = p.h || pw;
                     const pd = p.d || Math.min(pw, ph) * 0.4;
-                    portGroup = builder(pw, ph, pd, sc, p.color || '#888',
+                    portGroup = builder(pw, ph, pd, sc, p.color || '#888', // nofallback-ok: 舊版 flat-port 格式 port UI 顏色選填，'#888' 為裝飾性預設灰
                       { pins: p.pins, pitch: p.pitch, rows: p.rows });
                   }
                 } catch (e) {
@@ -343,7 +341,7 @@
               }
               const geo = new T.BoxGeometry(bw, bh, bd);
               const mt = new T.MeshStandardMaterial({
-                color: new T.Color(p.color || '#888'), roughness: 0.6, metalness: 0.1,
+                color: new T.Color(p.color || '#888'), roughness: 0.6, metalness: 0.1, // nofallback-ok: ghost box 合法防呆路徑（已有 console.error），'#888' 為 ghost 視覺識別色
               });
               const m = new T.Mesh(geo, mt);
               m.position.y = bh / 2; m.castShadow = true;
@@ -419,8 +417,8 @@
           if (edge.material) { edge.material.opacity = shown ? Math.max(op * 0.5, 0.15) : 0; edge.material.needsUpdate = true; }
         }
       };
-      _updateOp('stlMesh', baseOpacity ?? 0.82);
-      _updateOp('stlMeshLid', lidOpacity ?? 0.82);
+      _updateOp('stlMesh', baseOpacity ?? 0.82); // nofallback-ok: opacity effect hook UI 預設，同 L142
+      _updateOp('stlMeshLid', lidOpacity ?? 0.82); // nofallback-ok: opacity effect hook UI 預設，同 L144
       st.renderer.render(st.scene, st.camera);
     }, [baseOpacity, lidOpacity]);
 

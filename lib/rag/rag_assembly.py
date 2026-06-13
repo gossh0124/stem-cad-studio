@@ -51,8 +51,27 @@ def add_assembly(plan: dict, bridge: dict, assembly_id: Optional[str] = None):
     vec = embed_text(text)
 
     components = bridge.get("components", [])
-    total_weight = sum(c.get("spec", {}).get("weight_g", 10.0) for c in components)
-    total_thermal = sum(c.get("spec", {}).get("thermal_mw", 0.0) for c in components)
+    # SSOT discipline: weight_g / thermal_mw feed thermal/weight ranking, so a
+    # missing value must raise rather than be fabricated with a silent default
+    # (缺值一律 raise). Fabricating 10.0g pollutes the metric with no provenance.
+    total_weight = 0.0
+    total_thermal = 0.0
+    for c in components:
+        spec = c.get("spec", {})
+        if "weight_g" not in spec:
+            raise ValueError(
+                f"Component missing weight_g (no silent default): "
+                f"{c.get('name', c)!r} in project "
+                f"{bridge.get('project_name', 'unknown')!r}"
+            )
+        if "thermal_mw" not in spec:
+            raise ValueError(
+                f"Component missing thermal_mw (no silent default): "
+                f"{c.get('name', c)!r} in project "
+                f"{bridge.get('project_name', 'unknown')!r}"
+            )
+        total_weight += spec["weight_g"]
+        total_thermal += spec["thermal_mw"]
 
     record = {
         "assembly_id": assembly_id or bridge.get("project_name", "unknown"),
@@ -67,14 +86,16 @@ def add_assembly(plan: dict, bridge: dict, assembly_id: Optional[str] = None):
         "plan_json": json.dumps(plan, ensure_ascii=False),
     }
 
+    # Distinguish "table missing" (create it) from a real add failure
+    # (schema/dim mismatch, disk, etc.) which must propagate — otherwise the
+    # Phase IV SSOT assembly evidence is lost silently while we still log success.
     try:
         tbl = db.open_table(COLL_ASSEMBLY)
-        tbl.add([record])
     except Exception:
-        try:
-            db.create_table(COLL_ASSEMBLY, data=[record])
-        except Exception as e2:
-            _log.warning("Assembly write failed: %s", e2)
+        # Table does not exist yet — create it with this first record.
+        db.create_table(COLL_ASSEMBLY, data=[record])
+    else:
+        tbl.add([record])
 
     _log.info("Assembly decision indexed: %s", record["project_name"])
 

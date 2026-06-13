@@ -26,19 +26,18 @@ try:
 except (AttributeError, OSError):
     pass
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # scripts/builders/ → repo root (3 levels)
 sys.path.insert(0, str(ROOT))
-# NOTE: do NOT insert ROOT/"lib" at front — lib/tools.py would shadow the real
-# tools/ package and cause `from tools._canned_template_defs import TEMPLATE_DEFS`
-# to fail with "attempted relative import with no known parent package".
+# NOTE: canned template defs were moved from tools/ into lib/ during the V3
+# migration (tools/ is dev-only, not shipped); imported as lib.canned_template_defs below.
 
 from lib.registry import COMPONENT_REGISTRY  # noqa: E402
 from lib.config import EDUCATIONAL_RATIONALE_TEMPLATES, AREA_COMPACT_MAX_MM2, AREA_MEDIUM_MAX_MM2  # noqa: E402
-from lib.specs import POWER_MA, PRICE_NTD  # noqa: E402
+from lib.specs import POWER_MA, PRICE_NTD, POWER_BUDGET_MA, USB_BUDGET_MA  # noqa: E402
 from services.pipeline_runner import _build_role_alternatives  # noqa: E402
 from lib.wiring import to_json as wiring_to_json  # noqa: E402
 from lib.schematic import generate_svg as schematic_generate_svg  # noqa: E402
-from tools._canned_template_defs import TEMPLATE_DEFS  # noqa: E402
+from lib.canned_template_defs import TEMPLATE_DEFS  # noqa: E402
 
 # ─── Scaffold 生成器 ─────────────────────────────────────────────
 
@@ -51,19 +50,13 @@ def _component_size_mm(ctype: str) -> tuple:
 
 
 def _supply_ma(components: list) -> int:
-    """從 power role 元件決定供應電流上限。"""
-    _SUPPLY = {
-        "USB-Buck-5V-class": 2000, "LiPo-Charger-class": 1000,
-        "BatteryHolder-AA-class": 800, "Battery-AA-class": 800,
-        "USB-5V-class": 1000, "Battery-LiPo-class": 1000,
-        "AC-Adapter-class": 2000, "USB-Adapter-class": 1000,
-    }
+    """從 power role 元件決定供應電流上限（讀穿 specs.POWER_BUDGET_MA 單一官方源，#20）。"""
     for c in components:
         if c.get("role") == "Power":
-            v = _SUPPLY.get(c.get("type"))
+            v = POWER_BUDGET_MA.get(c.get("type", ""))
             if v:
-                return v
-    return 500  # 預設 USB 500mA
+                return int(v)
+    return int(USB_BUDGET_MA)  # 預設 USB 500mA
 
 
 def _enclosure_sizing(components: list) -> dict:
@@ -219,7 +212,7 @@ _PIN_BUDGET: dict[str, int] = {
 }
 
 _POWER_KEY: dict[str, str] = {
-    "Battery-AA-class": "AA", "Battery-LiPo-class": "LiPo",
+    "Battery-AA-class": "AA", "Battery-4AA-class": "Battery-4AA", "Battery-LiPo-class": "LiPo",
     "USB-5V-class": "USB-5V", "AC-Adapter-class": "DC-5V",
     "USB-Adapter-class": "USB-5V", "USB-Buck-5V-class": "USB-5V",
     "LiPo-Charger-class": "LiPo", "BatteryHolder-AA-class": "AA",
@@ -227,6 +220,11 @@ _POWER_KEY: dict[str, str] = {
 
 _OUTPUT_ROLES: frozenset[str] = frozenset({"Output", "Control"})
 _SENSOR_ROLES: frozenset[str] = frozenset({"Sensor"})
+
+# 直驅多實例件(biped 2026-06-13):qty>1 時每單元需獨立訊號腳(4×SG90 各一 PWM),
+# 故展開為帶 ~N 尾綴的獨立 wiring 實例(Servo, Servo~2, …)。driver-mediated 件(DC 馬達
+# 經 L298N 共驅動板)不在此集——維持單一 wiring(現況),qty 只進功耗/腳數預算。
+_MULTI_INSTANCE_DIRECT: frozenset[str] = frozenset({"Motor-Servo-class"})
 
 
 def build_canned_bridge(tpl_id: str, tpl: dict) -> dict:
@@ -266,12 +264,26 @@ def build_canned_bridge(tpl_id: str, tpl: dict) -> dict:
 
     # 合成 wiring + schematic：lib.wiring / lib.schematic
     brain_type = next((c["type"] for c in components if c.get("role") == "Brain"), "Arduino-Uno-class")
-    comp_names = [c["type"] for c in components if c.get("role") not in ("Power", "Housing", "Brain")]
+    comp_names = []
+    for c in components:
+        if c.get("role") in ("Power", "Housing", "Brain"):
+            continue
+        ctype = c["type"]
+        cqty = c.get("qty", 1)
+        comp_names.append(ctype)
+        if ctype in _MULTI_INSTANCE_DIRECT and cqty > 1:
+            # 第 2..N 個單元帶 ~N 尾綴 → 獨立 wiring/allocation 實例(各配獨立 SIG 腳)
+            comp_names.extend(f"{ctype}~{i}" for i in range(2, cqty + 1))
     try:
         wiring_data = wiring_to_json(brain_type, comp_names)
     except Exception as exc:
-        print(f"  [WARN]{tpl_id} wiring 合成失敗：{exc}")
-        wiring_data = {"brain": brain_type, "allocation": {}, "pin_labels": {}, "wiring": {}}
+        # No-Silent-Fallback: a wiring synthesis failure would ship an
+        # electrically-empty demo (empty allocation/pin_labels/wiring) that is
+        # still indexed as a valid canned case. Abort this template instead.
+        raise RuntimeError(
+            f"{tpl_id} wiring 合成失敗：{exc} — refusing to bake a canned bridge "
+            f"with empty wiring (brain={brain_type}, comps={comp_names})"
+        ) from exc
 
     # schematic SVG — 從 components 拆出 outputs / sensors，展開 qty
     svg_outputs = []
@@ -391,7 +403,12 @@ def build_canned_bridge(tpl_id: str, tpl: dict) -> dict:
             "engine": "build123d",
         }
     except Exception as exc:
-        print(f"  [WARN]{tpl_id} assembly solver failed: {exc}")
+        # No-Silent-Fallback: a solver crash would leave bridge without cad_output
+        # (no placements/STL) yet main() would still index it as a valid case.
+        raise RuntimeError(
+            f"{tpl_id} assembly solver failed: {exc} — refusing to bake a canned "
+            f"bridge without cad_output"
+        ) from exc
 
     # ── Phase 4 V3: SceneGraph (auto-sized enclosure + reserved wall holes) ──
     try:
@@ -413,9 +430,19 @@ def build_canned_bridge(tpl_id: str, tpl: dict) -> dict:
             actual_spec["inner_height"] = v3_inner[2]
             bridge["cad_output"]["spec"] = actual_spec
         if not scene_graph_v3.get("validation", {}).get("passed", False):
-            print(f"  [WARN]{tpl_id} scene_graph_v3 validation FAILED")
+            # Always-green-gate fix: a FAILED geometry/placement validation must
+            # block the bake, not just warn. Otherwise a broken scene ships
+            # byte-identically to a passing one and is indexed as a valid demo.
+            raise RuntimeError(
+                f"{tpl_id} scene_graph_v3 validation FAILED — refusing to index a "
+                f"canned bridge with an invalid scene graph"
+            )
     except Exception as exc:
-        print(f"  [WARN]{tpl_id} assembly solver v3 failed: {exc}")
+        # Re-raise so a solver crash aborts the bake instead of shipping a bridge
+        # without scene_graph_v3 (no placements/STL) that main() would still index.
+        raise RuntimeError(
+            f"{tpl_id} assembly solver v3 failed: {exc}"
+        ) from exc
 
     return bridge
 
