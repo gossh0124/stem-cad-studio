@@ -13,6 +13,8 @@ import copy
 
 import pytest
 
+pytest.importorskip("build123d")  # lib.cad eager-imports build123d (component_bodies)
+
 from lib.cad import hl_dsl
 from lib.cad.hl_dsl import (
     compile_to_solver_dict,

@@ -18,6 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
+pytest.importorskip("build123d")  # lib.module_builder (imported below) -> lib.cad eager-imports build123d
+
 from lib.component_resolver import (
     ResolveResult,
     extract_mentions,

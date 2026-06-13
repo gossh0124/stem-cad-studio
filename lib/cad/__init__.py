@@ -27,16 +27,29 @@ from .mounts import (
     build_speaker_grill,
     ALL_MOUNTS,
 )
-from .component_bodies import (
-    gen_motor_dc as gen_body_motor_dc,
-    gen_motor_servo as gen_body_motor_servo,
-    gen_motor_stepper as gen_body_motor_stepper,
-    gen_pump_water,
-    gen_speaker,
-    gen_l298n,
-    _GEN_MAP as COMPONENT_BODY_GEN_MAP,
-    bake_all as bake_component_bodies,
-)
+# component_bodies imports build123d eagerly (heavy OCCT dep). Lazy-load its
+# symbols via PEP 562 so `import lib.cad` and non-geometry submodules (e.g.
+# mounts Spec dataclasses, tests/test_cad_mounts.py) stay importable without
+# build123d. Accessing any symbol below imports component_bodies on demand,
+# raising loudly if build123d is genuinely absent at use time (no silent fallback).
+_LAZY_COMPONENT_BODIES = {
+    'gen_body_motor_dc': 'gen_motor_dc',
+    'gen_body_motor_servo': 'gen_motor_servo',
+    'gen_body_motor_stepper': 'gen_motor_stepper',
+    'gen_pump_water': 'gen_pump_water',
+    'gen_speaker': 'gen_speaker',
+    'gen_l298n': 'gen_l298n',
+    'COMPONENT_BODY_GEN_MAP': '_GEN_MAP',
+    'bake_component_bodies': 'bake_all',
+}
+
+
+def __getattr__(name):
+    src = _LAZY_COMPONENT_BODIES.get(name)
+    if src is not None:
+        from . import component_bodies
+        return getattr(component_bodies, src)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     'build_pcb_enclosure',

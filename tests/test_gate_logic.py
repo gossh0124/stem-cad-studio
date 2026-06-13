@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from unittest.mock import patch, MagicMock
 
+pytest.importorskip("build123d")  # module-level build123d import for gate geometry assertions
+
 from services.shared.models import Job, JobStatus, PhaseID
 from services.shared.constants import CHOICE_SKIP_GATE, CHOICE_CONFIRM_SWAPS
 

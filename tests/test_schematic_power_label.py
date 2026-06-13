@@ -54,6 +54,7 @@ def test_known_ui_short_still_labels():
 def test_api_schematic_422_on_unfitting_power(monkeypatch):
     """API 邊界:未知/不適配電源 → /api/v1/schematic 回 422(與 /api/v1/wiring 一致),
     非靜默產出誤標原理圖。"""
+    pytest.importorskip("build123d")  # API route boots full pipeline (lib.cad/build123d)
     monkeypatch.setenv("CADHLLM_ALLOW_DEV_SECRET", "1")
     import asyncio
     from fastapi import HTTPException

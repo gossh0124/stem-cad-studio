@@ -4,6 +4,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+pytest.importorskip("build123d")  # lib.assembly_solver.assembly_solver_v3 -> lib.cad eager-imports build123d
 from lib.assembly_solver.assembly_solver_v3 import (
     solve_v3,
     _pack_maxrects,

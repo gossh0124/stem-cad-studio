@@ -5,6 +5,8 @@ no-fallback: each must produce real geometry, never an empty/degenerate part.
 """
 import pytest
 
+pytest.importorskip("build123d")  # tests build123d component-body gen functions (lib.cad.component_bodies)
+
 from lib.registry import COMPONENT_REGISTRY
 
 # The 12 classes that lacked a PCB-body mesh and now have a procedural one.

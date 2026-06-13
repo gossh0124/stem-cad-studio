@@ -137,6 +137,7 @@ class TestPowerSourceWiring:
     def test_api_wiring_returns_422_for_unresolvable_power(self, monkeypatch):
         # route 層:/api/v1/wiring 對不可解析 power 回 HTTP 422(設計問題),非 200 + 幽靈電源。
         # import routes_design 會觸發 auth.py fail-loud(防 hardcoded JWT)→ 測試環境顯式 opt-in。
+        pytest.importorskip("build123d")  # API route boots full pipeline (lib.cad/build123d)
         monkeypatch.setenv("CADHLLM_ALLOW_DEV_SECRET", "1")
         import asyncio
         from fastapi import HTTPException

@@ -80,6 +80,7 @@ class TestCompletenessRuntimeGate:
     def test_api_schematic_refuses_incomplete(self, monkeypatch):
         """api_schematic 對不完整元件回 422(非靜默渲染)。全 43 SSOT class 現皆 complete/WIP,
         無法用真元件觸發 → patch 偵測函式本身,證 route 確有接上 gate 並轉 422。"""
+        pytest.importorskip("build123d")  # API route boots full pipeline (lib.cad/build123d)
         monkeypatch.setenv("CADHLLM_ALLOW_DEV_SECRET", "1")
         import asyncio
         from fastapi import HTTPException
@@ -97,6 +98,7 @@ class TestCompletenessRuntimeGate:
 
     def test_api_schematic_renders_complete_set(self, monkeypatch):
         """happy path:完整元件集 → api_schematic 正常回 raw_svg(gate 不誤擋)。"""
+        pytest.importorskip("build123d")  # API route boots full pipeline (lib.cad/build123d)
         monkeypatch.setenv("CADHLLM_ALLOW_DEV_SECRET", "1")
         import asyncio
         from services.gateway.routes_design import api_schematic, DesignRequest

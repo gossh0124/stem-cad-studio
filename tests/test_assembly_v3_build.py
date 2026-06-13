@@ -6,6 +6,8 @@ scene, so it pins the V3 contract the STL path now depends on.
 """
 import pytest
 
+pytest.importorskip("build123d")  # build_assembly_from_scene -> lib.cad eager-imports build123d
+
 from lib.cad.shell.assembly_v3_build import build_assembly_from_scene
 
 

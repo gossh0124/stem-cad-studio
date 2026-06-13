@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 trimesh = pytest.importorskip("trimesh")
+pytest.importorskip("build123d")  # lib.cad.glb_convert -> lib.cad eager-imports build123d
 
 from lib.cad.glb_convert import stl_to_glb, ensure_shell_glbs
 

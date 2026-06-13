@@ -3,6 +3,9 @@ import sys, os
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
+pytest.importorskip("build123d")  # lib.assembly_solver -> lib.registry/lib.cad eager-import build123d
+
 from lib.assembly_solver import solve
 
 # ── 共用 fixtures ────────────────────────────────────────

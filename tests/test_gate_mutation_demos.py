@@ -25,6 +25,8 @@ import pathlib
 
 import pytest
 
+pytest.importorskip("build123d")  # transitive isolation/role gate imports pull lib.cad (build123d)
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
